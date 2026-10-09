@@ -5,9 +5,9 @@ description: Building and fixing a running Cities Skylines II (CS2) city through
 
 # CS2 city building through the MCP
 
-Lessons from rebuilding and zoning large districts (a curved waterfront mid-rise district, a deathcare crisis in a
-large, dense city) through the CS2 MCP. Rules marked **STANDING** are recommended practice - follow them unless the
-user says otherwise. Code lives in this repo: the C# game mod in `mod/`, the Python MCP server in `server/`; layout
+Lessons from rebuilding and zoning large districts (curved waterfront districts, deathcare backlogs in
+large, dense cities) through the CS2 MCP. Rules marked **STANDING** are recommended practice - follow them unless the
+project needs otherwise. Code lives in this repo: the C# game mod in `mod/`, the Python MCP server in `server/`; layout
 rules + code map in `docs/ROAD_LAYOUT.md`.
 
 ## 1. Zoning geometry - the rules (STANDING)
@@ -55,8 +55,8 @@ frontage columns. At a right-angle corner one block takes the corner square: no 
    52 m, rebuilds cross streets, heals T-end split nodes, restores zoning). Moving one line works mechanically but
    neighbouring seams stay - they belong to OTHER off-lattice lines; a grid only closes when all its lines are on the
    lattice, and lines touching curved (squared-end) streets can't be moved by the tool. In built districts the payoff
-   per demolition is low: a 5-line, ~130-building repair pass cut district crack area only ~1% (27,380 -> ~27,100 m2),
-   and an 884 m avenue move was refused at its highway-ramp end (7 buildings lost access) and had to be undone
+   per demolition is low: a small repair pass (a few lines, ~100 buildings) cut district crack area only ~1%,
+   and a long avenue move can be refused at its highway-ramp end (7 buildings lost access) and had to be undone
    (12 undo steps, flags re-set, 921 cells refilled). move_line now refuses ramp-connected lines. Most remaining crack
    area sits in curved waterfront rib blocks. Verdict: don't repair built districts line by line; lay new grids on the
    lattice (default now) or rebuild a whole grid from scratch if the user wants it perfect.
@@ -70,7 +70,7 @@ frontage columns. At a right-angle corner one block takes the corner square: no 
   `holes`, `not_square_junctions`, `dead_gaps`, `skewed_junctions`, verdict + map marks H/Q/G/S/D. Iterate until the
   verdict is "good". Every road builder's `dry_run` / `plan_only` and grid/rim previews carry a `zoning_forecast`
   judging only what the draft adds. Calibrated: good grids read 90-94% straight full depth (game's own blocks ~95%).
-- `cs2_inspect sections=[roads.dead_ends, roads.islands]` after every stage - a rebuilt district was once a 7 km
+- `cs2_inspect sections=[roads.dead_ends, roads.islands]` after every stage - a rebuilt district can end up a multi-km
   island connected to nothing.
 
 ## 2. Layout tools and when to use them
@@ -169,10 +169,10 @@ frontage columns. At a right-angle corner one block takes the corner square: no 
 - Hearses carry 1 body; a crematorium over storage capacity stops dispatching. Crematorium01: 10 hearses, 100 bodies/
   month, storage 20; FR_Crematorium (16x24 m): 5 hearses, 100/month, storage 10 - cheap to sprinkle in dense cores.
 - `cs2_service_coverage services=["deathcare"]` (mod >= 0.27) + `health_census` (mod >= 0.29 splits waiting / at
-  facility / in transit). A large city can need dozens of crematoria; the real bottleneck was hearse trips in the dense core.
+  facility / in transit). A large city can need dozens of crematoria; the real bottleneck is often hearse trips in the dense core.
 - New big residential (e.g. a 1,300-resident tower) gets old-age deaths within days - not a bug.
-- After ~40 crematoria, bodies waiting in homes fell 3,274 -> 1,594. Next bottleneck = storage (crematoria near full,
-  big Crematorium01s far over at 212/20). Levers: Health & Deathcare budget 150% (efficiency 125% -> more processing +
+- Adding crematoria can roughly halve bodies waiting in homes. Next bottleneck = storage (crematoria near full,
+  big Crematorium01s far over their storage). Levers: Health & Deathcare budget 150% (efficiency 125% -> more processing +
   hearses); CEMETERIES (Cemetery02 112x48: 8 hearses, 1,500 long-term storage; Cemetery01 128x200: 15 hearses, 5,000) -
   hard to fit in a built city (very large search boxes coarsen the grid and miss lots - search in ~1.5 km tiles);
   Hearse Garage upgrade (+5 hearses) via `cs2_place_building type="Crematorium01 Hearse Garage"

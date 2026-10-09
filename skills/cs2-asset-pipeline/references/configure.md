@@ -71,7 +71,7 @@ Check the exact template names first. Use `cs2_list_building_types`, or `describ
   - Households stay 0 for a pure office (`m_ResidentialProperties`). A mixed-use tower can set both.
 - **City service** (e.g. a train station): import with `preset=CityServiceBuilding` or `template=<vanilla station>`.
   Stations need tracks and platforms as sub-nets, which the pipeline does not generate yet (planned: a layout JSON from
-  Blender). Placing buildings with sub-nets once crashed the game; `cs2_place_building` refuses them unless
+  Blender). Placing buildings with sub-nets can crash the game; `cs2_place_building` refuses them unless
   `allow_subnets=true`, after saving.
 - **Static prop / landmark with no simulation**: `preset=StaticObject`.
 - **Growable (zoned) building**: `preset=SpawnableBuilding`. The level and zone come from the name (`_L#`) and the

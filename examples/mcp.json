@@ -3,7 +3,7 @@
     "cs2": {
       "type": "stdio",
       "command": "python",
-      "args": ["C:\path\to\cs2-mcp\server\cs2_mcp.py"]
+      "args": ["C:/path/to/cs2-mcp/server/cs2_mcp.py"]
     }
   }
 }

@@ -228,7 +228,7 @@ after a restart plus a new placement.
 building scripts hard-code Blender coordinates and silently shift otherwise.
 
 **Transit stations (tracks, platforms, pedestrians, glass pits, upgrades): read `references/stations.md` FIRST.** It is the
-full recipe from a large Union Station build plus every pitfall. Key traps:
+full recipe from a large through-station build plus every pitfall. Key traps:
   - Sub-nets, sub-objects and areas only take effect after a GAME RESTART plus a NEW placement.
   - Areas join only through Pedestrian Access Location markers.
   - Underground area nodes need parent mesh 0.
@@ -242,7 +242,7 @@ tell the user something is impossible without checking the game's own prefabs.
 
 - `cs2_place_building type=<Theme>_<Name>` at a spot the user chooses (`allow_subnets=true` for stations; dry-run
   first). **Mod ≥ 0.19 creates sub-areas like the build menu does** (walking/park areas, surfaces, Clip Surfaces). It
-  was verified on Union Station: 77 areas, 0 pedestrian icons. On older mods, the user places from the build menu.
+  was verified on a large station: dozens of areas, 0 pedestrian icons. On older mods, the user places from the build menu.
   - When the lot size changes, recompute the centre so the FRONT edge stays on the road:
     centre = front-edge-midpoint − facing × (lot depth ÷ 2).
   A signature building can be placed once per city.
@@ -285,7 +285,7 @@ tell the user something is impossible without checking the game's own prefabs.
 The player usually waits at the main menu while a round runs, so every minute counts. A 400-mesh round went from ~2 h to ~45 min:
 - **Texture-only changes never need mesh re-imports.** The importer re-compresses the shared atlas (BC7, all maps, all
   LODs) for EVERY asset, which dominates import time. Instead: re-import ONE reference asset (or only the assets whose
-  geometry changed), then with the game CLOSED run `scripts/texture_swap.py <reference asset> [--prefix NA_PK]`. A
+  geometry changed), then with the game CLOSED run `scripts/texture_swap.py <reference asset> [--prefix NA_MyPack]`. A
   `.Surface` stores each texture as `_<Slot>\xFF<16-byte GUID>` (slots BaseColorMap / ControlMask / MaskMap / NormalMap;
   `_Win` surfaces use InteriorAtlas etc. - left alone), so main surfaces get the reference's main GUIDs and `_LOD1/_LOD2`
   surfaces its LOD1 GUIDs, in seconds. Then `dedupe_textures.py <prefix>`. Always copy the new atlas PNGs into every asset
@@ -306,12 +306,12 @@ The player usually waits at the main menu while a round runs, so every minute co
 - **Batch the restart.** One round = menu work -> user QUITS -> offline steps (texture_swap, dedupe) -> start = the one
   restart. Never plan a second restart for the offline steps.
 - **Expect the offline cleanup to take minutes after a FULL re-import.** Every re-import writes its own copy of every texture
-  (400 meshes x 12 maps = ~18 GB); `dedupe_textures.py` must read + hash all of it (a 400-mesh pack: ~5 min, freed 18.4 GB).
+  (hundreds of meshes x 12 maps = tens of GB); `dedupe_textures.py` must read + hash all of it (minutes for a pack that size).
   Tell the user up front; don't start the game until it prints `DEDUPE unique`. The backup folder grows by the same amount -
   prune `_cs2_asset_backups\_texture_dedupe_backup` once the game has been verified.
 - **Baked LOD2 (vanilla-style):** flat-colour LOD2s read as blocks; bake a small orthographic top + 4-side picture of LOD0 per
   mesh into ONE shared LOD2 atlas and project the LOD2 UVs onto it (allocate atlas cells, export LOD2-only renders, then
-  compose; 400 meshes baked in ~10 min). texture_swap.py handles `_LOD2_` surfaces separately.
+  compose; hundreds of meshes take minutes). texture_swap.py handles `_LOD2_` surfaces separately.
 - Future (needs a mod deploy): a batch `asset_configure` RPC (many prefabs per call, one save pass) would cut per-prefab
   overhead further.
 

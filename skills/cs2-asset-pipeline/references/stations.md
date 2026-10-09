@@ -1,6 +1,6 @@
 # Transit stations with built-in tracks
 
-This is the full recipe and every pitfall from building a large custom Union Station asset (**NA_UnionStation**): train
+This is the full recipe and every pitfall from building a large custom through-station asset (**<Name>**): train
 and subway tracks underground on two crossing levels, an open pit under a floating glass canopy, and a "Station Services"
 upgrade. The example project layout: `station_layout.py` (the single source of truth, §1), `build_station.py`,
 `export_station.py`, `make_station_atlas.py`, `build_lods.py`, plus a PLAN.md.
@@ -341,7 +341,7 @@ Platforms and track sets can ship as upgrades, like Station Services, so the pla
   - The base LODs include only base parts.
 - **Game:**
   - First import of each add-on: `template="TrainStation03 Services"` from a LOADED city.
-  - Then configure: remove `CompanyObject`; add the 3 list components; set `ServiceUpgrade.m_Buildings = ["NA_UnionStation"]`,
+  - Then configure: remove `CompanyObject`; add the 3 list components; set `ServiceUpgrade.m_Buildings = ["<Name>"]`,
     `m_ForbidMultiple`, comfort 0 and the lists.
   - Restart; the player builds the upgrades from the station's upgrade panel (native, so areas get created).
   - A `game_cycle.py` script in the project can automate it.
@@ -440,7 +440,7 @@ closed glass enclosure + brick arches. Techniques worth keeping:
   new placements immediately, the MESH only after restart + import). Always restart + import before the user judges a
   placement.
 
-## Small elevated train + subway interchange (example: Union Crossing)
+## Small elevated train + subway interchange (example: a small interchange asset)
 Script chain: `crossing_layout.py` -> `build_crossing.py` [Blender] -> `export_crossing.py` [Blender] ->
 `make_crossing_atlas.py` -> `check_crossing.py` [--with-addons] -> a game script (`first` | `update`).
 - Lot 14 x 8, game frame directly (front +z). Elevated train = vanilla `Double Train Track - Twoway` at y 10 with
@@ -451,7 +451,7 @@ Script chain: `crossing_layout.py` -> `build_crossing.py` [Blender] -> `export_c
   transfer stairs from the parallel platforms (descending away from the tracks, 14 m runs).
 - Imported + configured with NO restart (first import from the loaded city; configure applies to new placements).
 
-## Bus terminal inside a building + subway add-on (example: a twin office tower complex)
+## Bus terminal inside a building + subway add-on (example: a mixed-use complex)
 Script chain: a `bus_layout.py` -> the tower build's bus-terminal step / `build_subway.py` -> the exporter writes
 `<Name>_layout.json` per asset -> a game script.
 - **Vanilla pattern (BusStation03, read with describe):**

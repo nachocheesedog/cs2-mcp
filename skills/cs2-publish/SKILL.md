@@ -32,7 +32,7 @@ Keep it frictionless:
    Between steps 2 and 4, Claude also takes the **in-game screenshots** (Stage 3b) after asking to borrow the camera.
 6. **The user uploads and presses Submit.** Claude confirms afterwards via the Stage 6 checks and records the result.
 
-## Standing rules
+## Project rules
 - **Privacy:** nothing in the upload may identify the user except their Paradox screen name. That means no Windows
   user name, PC name, e-mail, real name or file paths, and no image metadata (EXIF, PNG text, XMP, C2PA).
 - **No backtracking:** find problems BEFORE the upload. Typical post-publish bugs (smeared textures from out-of-range
@@ -45,8 +45,8 @@ Keep it frictionless:
 - The asset's final version is exported, validated (`cs2_asset_validate`: 0 problems) and **imported into the game**.
 - The user has seen it in game and is happy with it.
 - Re-imports use `preset=None` at the main menu. If the geometry is locked, the game needs a restart.
-- **Companions:** list every prefab that must ship with the asset, such as upgrades (e.g. `NA_UnionStationServices`
-  with `NA_UnionStation`) or props. They go into the same package through Build Package → "Add Asset".
+- **Companions:** list every prefab that must ship with the asset, such as upgrades (e.g. a `<Name>Services`
+  companion with its `<Name>` station) or props. They go into the same package through Build Package → "Add Asset".
 
 ## Stage 0b — save compatibility (the game handles it; VERIFY, don't build)
 Saves reference a prefab by `PrefabID` = type + name + hash. A local asset's hash is its asset GUID; a subscribed
@@ -71,7 +71,7 @@ by hand.
 6. Only then save normally. Keep the backup. Never restore it while subscribed: that would load two copies.
 
 ## Stage 1 — technical checks (all must pass)
-- **VT gate (a package with an empty VT cache once shipped and crashed every subscriber's game at start):**
+- **VT gate (a package with an empty VT cache crashes every subscriber's game at start):**
   - Before the final import: `python ~/.claude/skills/cs2-asset-pipeline/scripts/optimize_textures.py <proj>/cs2/<Name> --check`
     must print `VT_CHECK ... OK` for every asset: each material's maps all the same size and >= 512 px.
   - After Build Package, BEFORE Submit: `python ~/.claude/skills/cs2-publish/scripts/package_vt_check.py
@@ -89,8 +89,8 @@ by hand.
 - **In-game check** (daylight, close up): tiled textures show their pattern on every face, the icon shows in the build
   menu, windows light up at night, and every LOD looks right.
 - **Service-access gate** (any building people live or work in): `cs2_path_test id=<placed building> mode=hearse` and
-  `mode=ambulance` must both return found=true for every building type/layout in the upload (mod >= 0.42). A growable
-  pack once shipped with door-side access markers that blocked hearses + ambulances - see cs2-asset-pipeline
+  `mode=ambulance` must both return found=true for every building type/layout in the upload (mod >= 0.42). Growable
+  packs with door-side access markers can block hearses + ambulances - see cs2-asset-pipeline
   troubleshooting "Dead waiting for hearse".
 
 ## Stage 2 — privacy audit
@@ -252,13 +252,13 @@ Claude cannot type into the game UI: there is no computer use and no upload tool
 - Record the result in the asset's project notes: version, visibility, date, and any leftover to-dos.
 
 ## Stage 7 — updates (proven route; follow it step by step)
-Official guide: cs2.paradoxwikis.com/Assets:_Package,_Share_and_Upload (update section). This tested variant differs in
-one point: while updating, the user is NOT subscribed to their own mod (see "Why").
+Official guide: cs2.paradoxwikis.com/Assets:_Package,_Share_and_Upload (update section). This variant differs in
+one point: while updating, the author is NOT subscribed to the mod (see "Why").
 
 **A. Prepare**
 1. Final files on disk. Gates: `optimize_textures.py <proj>/cs2/<Name> --check` (VT gate) = OK, Stage 1 UV check,
    Stage 2 privacy audit.
-2. The user UNSUBSCRIBES from their own mod on mods.paradoxplaza.com BEFORE launching. Merely switching it off in the
+2. When updating an asset you also run locally: UNSUBSCRIBE from the mod on mods.paradoxplaza.com BEFORE launching. Merely switching it off in the
    playset is not enough: it is re-downloaded at every start.
 3. If the game was running the subscription (after a Stage 0b switch-over), then with the game CLOSED:
    - move `.cache\Mods\pdx_mods\<mod id>_*` out (park it, don't delete);
@@ -294,15 +294,15 @@ one point: while updating, the user is NOT subscribed to their own mod (see "Why
     - ALL VERSIONS lists v.N;
     - the author page still has the same number of mods (no duplicate);
     - `.packages` is empty again.
-13. Later (optional): switch the user's game to the subscription (Stage 0b). The user subscribes, then with the game
+13. Later (optional): switch the game to the subscription (Stage 0b). Subscribe, then with the game
     closed the local copy moves to the backup folder. Only ONE copy may be loaded.
 
 **Why / failure modes seen**
 - Start crash FATAL "Can't test if a material is a duplicate with registered materials"
   (AtlasMaterialsGrouper.IsDuplicate <- TextureStreamingSystem.Initialize) = a mounted package whose VT MidMips cache is
-  EMPTY. A package with 64 px / mixed-size textures got every material dropped from VT when packaged. That was the
+  EMPTY. A package with 64 px / mixed-size textures has every material dropped from VT when packaged. That is the
   cause, not duplicate copies (those only give WARNs). Recovery: game closed, park `pdx_mods\<mod id>_*`, unsubscribe.
 - Subscribing in game while it runs auto-enables the mod and hot-loads it next to the local copy ("Duplicate prefab
-  ID ... assetdb://paradoxmods", "Failed to enable/disable Mod '<mod id>'"). An update submitted from that state became
+  ID ... assetdb://paradoxmods", "Failed to enable/disable Mod '<mod id>'"). An update submitted from that state becomes
   a new mod.
 - Run Stages 1-2 again for every update.

@@ -5,7 +5,7 @@
 # Format (decompiled AtlasMaterialsGrouper.Read + AtlasCategory(BinaryReader), game 1.6.2f1): int tileSize, int mipLevels,
 # int maxGroupSize, int stacks, int groups, int entries; per stack: int count, then per category: int w, int h,
 # int entries, int firstTile, int tiles, bool preProcessedMidMipDisabled, int mipBiasOverride.
-# REGISTERED MATERIALS = sum of entries over categories that are not disabled. 0 = every subscriber's game crashes at start
+# REGISTERED MATERIALS = sum of entries over categories that are not disabled. 0 = a game loading this package crashes at start
 # (FATAL "Can't test if a material is a duplicate with registered materials"). Expect about 2 x the number of materials
 # (two VT stacks per material): e.g. 26 for a 13-material package, 6 for a 3-material tower, 0 = broken.
 import sys, os, glob, struct, zipfile
@@ -39,7 +39,7 @@ for p in paths:
         tile, mips, ng, ne, cats = parse(z.read(n))
         reg = sum(ec for (_s, _w, _h, ec, dis) in cats if not dis)
         sizes = sorted({f"{w}x{h}" for (_s, w, h, _e, _d) in cats})
-        verdict = "OK" if reg > 0 else "BROKEN - empty cache, crashes every subscriber's game at start; do NOT submit"
+        verdict = "OK" if reg > 0 else "BROKEN - empty cache, crashes the game at start; do NOT submit"
         bad += reg == 0
         print(f"PKG_VT {os.path.basename(p)}: {n} tile {tile} mips {mips} categories {len(cats)} sizes {sizes} "
               f"registered materials {reg} (surfaces in package {surfaces}) -> {verdict}")

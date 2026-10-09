@@ -156,7 +156,7 @@ def ribs(rpc, a):
             report[kind] = report.get(kind, 0) + 1
             if info is not None: report.setdefault(kind + "_at", []).append(info)
 
-    # v0.27b: a dropped rib leaves a block two pitches wide - a hole nothing can zone (user rule: no holes). List them.
+    # v0.27b: a dropped rib leaves a block two pitches wide - a hole nothing can zone (layout rule: no holes). List them.
     built_s = sorted([arc_of(tuple(r["start"]))[1] for r in segs] + ([] if a.get("build_anchors") else list(anchors)))
     wide = [{"from_m": round(a_), "to_m": round(b_), "gap_m": round(b_ - a_), "at": [round(v) for v in at((a_ + b_) / 2)[0]]}
             for a_, b_ in zip(built_s, built_s[1:]) if b_ - a_ > pitch + 20]

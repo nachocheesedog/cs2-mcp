@@ -3,17 +3,25 @@
 Code-modding (scripting) rules from the same Discord are summarised in `game-internals.md` ("Code-modding
 guidelines"); read them before changing the CS2MCP mod.
 
-Source: the "Cities: Skylines Modding" Discord, Knowledgebase → `#resources-asset-creation` (forum). Reading it needs a
-logged-in Discord session in a browser; read only. Key threads:
-- "[WIP] Level of Detail: Concept and Creation of LOD Meshes" (REV0, built on tests by Feindbold and kjmci)
-- "Up to Date | Technical Pipeline | Using New Windows Shaders" (REV0, for game 1.6.2f1)
-- "Window layout guidance" (Macwelshman + TheOcter; includes a WindowsIlluminationMapRef image and a Blender UV add-on)
-- Also useful, not yet read in full: "Asset Creation Pipeline using only Blender" (cbudd), "Ultimate Guide to dealing
-  with EmissiveID Textures", "Creating LOD1 and LOD2 models with InstaLOD" (kjmci), "MW CS2 Combiner App" (texture packer).
-Official reference: https://cs2.paradoxwikis.com/Asset_Pipeline:_Buildings (condensed with our deviations in `wiki_buildings.md`)
-Reading tips: Discord keeps only ~10-50 messages in the DOM, so open a thread AT its first message
-(`/channels/<guild>/<thread>/<thread>`) and read `[id^="message-content-"]`. Widen the viewport (resize_window 1500x1000)
-if the pane is narrow. Attachments open on cdn.discordapp.com; Browser-pane zoom crop is not supported.
+## Credits
+
+Everything in this file is condensed from guides written by members of the **Cities: Skylines Modding** Discord
+community (Knowledgebase → `#resources-asset-creation`). The knowledge and the testing behind it are theirs; this is
+only a summary with notes on how our pipeline applies it. Please read the original threads (and thank the authors)
+there: they carry images, add-ons and detail this summary leaves out.
+
+| Guide (thread title) | Author(s) / credit |
+|---|---|
+| "[WIP] Level of Detail: Concept and Creation of LOD Meshes" | Cities: Skylines Modding Knowledgebase, built on tests by **Feindbold** and **kjmci** |
+| "Up to Date \| Technical Pipeline \| Using New Windows Shaders" (game 1.6.2f1) | Cities: Skylines Modding Knowledgebase authors |
+| "Window layout guidance" (WindowsIlluminationMapRef image, per-zone window sheets) | **Macwelshman** and **TheOcter** |
+| "MW_CS2_Window_UV_Distributor" Blender add-on | **Macwelshman** |
+| "Asset Creation Pipeline using only Blender" | **cbudd** |
+| "Creating LOD1 and LOD2 models with InstaLOD" | **kjmci** |
+| "Ultimate Guide to dealing with EmissiveID Textures", "MW CS2 Combiner App" (texture packer) | Cities: Skylines Modding Knowledgebase authors |
+
+Official reference: the Paradox wiki page "Asset Pipeline: Buildings"
+(https://cs2.paradoxwikis.com/Asset_Pipeline:_Buildings), condensed with our deviations in `wiki_buildings.md`.
 
 ## LOD rules (official technical guideline + the tutorial)
 - CS2 uses 3 LODs: LOD0 main, LOD1 mid distance, LOD2 far.

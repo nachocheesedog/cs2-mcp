@@ -35,6 +35,7 @@ server/cs2_mcp.py ──── HTTP, 127.0.0.1:17654 only ────▶ CS2MCP
 - [Troubleshooting](#troubleshooting)
 - [Uninstall](#uninstall)
 - [Development](#development)
+- [Credits](#credits)
 - [License](#license)
 
 ## What it can do
@@ -238,6 +239,17 @@ After you add or change a tool, regenerate the reference with `python tools/gen_
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#adding-a-tool) walks through adding a tool end to end.
 
 Issues and pull requests are welcome. Please include your game version and the relevant lines of `CS2MCP.log`.
+
+## Credits
+
+The asset skills stand on work by the **Cities: Skylines Modding** Discord community. Their knowledgebase guides on
+LODs, window shaders, window layout and Blender pipelines — by **Feindbold**, **kjmci**, **Macwelshman**, **TheOcter**,
+**cbudd** and the other knowledgebase authors — are summarised, with full credit per guide, in
+[`skills/cs2-asset-pipeline/references/community_guidelines.md`](skills/cs2-asset-pipeline/references/community_guidelines.md).
+The official [Asset Pipeline: Buildings](https://cs2.paradoxwikis.com/Asset_Pipeline:_Buildings) wiki page by Paradox
+Interactive / Colossal Order and the wiki's contributors is summarised in
+[`wiki_buildings.md`](skills/cs2-asset-pipeline/references/wiki_buildings.md). Please read the originals; they have far
+more detail, images and tools than these notes.
 
 ## License
 

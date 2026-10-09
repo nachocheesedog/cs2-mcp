@@ -1,7 +1,6 @@
 # Road layout for zoning — rules the tools follow
 
-Learned from a waterfront district built entirely with these tools (then found sparse and awkward), and calibrated
-against the game's own zone blocks in several vanilla-style suburbs.
+Learned from building whole districts with these tools, and calibrated against the game's own zone blocks.
 
 ## How the game zones
 - Every zonable road (not highways, ramps, tracks, bridges/tunnels) gets a zone block on **each side, 6 cells = 48 m
@@ -24,8 +23,8 @@ against the game's own zone blocks in several vanilla-style suburbs.
    pitch). `cs2_district_grid` does this automatically, also when you give `angle_deg`.
 5. **Straight (grid) roads target ~100% full depth, no dead gaps, no skewed junctions.** Curved / waterfront roads may lose
    some.
-6. **Zone what you build.** Unzoned frontage looks like empty land (over a thousand zonable cells left
-   unzoned were the main reason that district looked sparse). Build results report the unzoned
+6. **Zone what you build.** Unzoned frontage looks like empty land (large unzoned stretches are the usual reason a new
+   district looks sparse). Build results report the unzoned
    cells a plan left.
 
 7. **No holes inside blocks.** Every block is at most two zoning depths across (96 m + road) in BOTH directions reachable

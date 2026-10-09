@@ -1,9 +1,11 @@
 # Official wiki: Asset Pipeline: Buildings (condensed)
 
-Source: https://cs2.paradoxwikis.com/Asset_Pipeline:_Buildings (Paradox-verified for game 1.5.2f1; read the raw text
-via `index.php?title=Asset_Pipeline:_Buildings&action=raw` in a real browser; curl/WebFetch hit a bot wall or only
-return a summary). This file is the wiki's rules condensed, each with **Ours:** where our pipeline differs or has
-learned more. Where our decompile/in-game findings disagree with the wiki, ours win, but note it.
+**Source and credit:** the official *Cities: Skylines II Wiki* page "Asset Pipeline: Buildings"
+(https://cs2.paradoxwikis.com/Asset_Pipeline:_Buildings), Paradox-verified for game 1.5.2f1, written by Paradox
+Interactive / Colossal Order and the wiki's contributors. Wiki content is used under the wiki's own licence (see the
+footer of the page). This file is a condensed summary of their rules, each with **Ours:** where our pipeline differs
+or has learned more; go to the original page for the full text and images. Where our decompile/in-game findings
+disagree with the wiki, ours win, but note it.
 
 ## Contents
 1. Building types: zoned (levels, tri budgets, lots), service (vehicles, helipads, upgrades), signature

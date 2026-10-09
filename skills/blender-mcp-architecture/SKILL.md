@@ -78,11 +78,11 @@ Reusable code: `helpers/lbt_helpers.py` in this skill folder (materials builder,
 - Presentation-only props (trains) go in their own collection that is excluded from export.
 
 ## Recreating a real building ("1:1")
-- Engineering papers beat press articles. The RJC/ArcelorMittal PDF for One Bloor West had the column grid, outrigger
+- Engineering papers beat press articles. A structural engineer's paper on a supertall tower can give the column grid, outrigger
   levels and a massing model. Download it with WebFetch (it saves the binary), then extract text and page images with
   python `fitz` (PyMuPDF). Poppler is not installed, so Read cannot open PDFs.
-- Get CURRENT construction photos (UrbanToronto/skyrisecities CDN, etc.). The first pass built from articles
-  alone was far off; the photos showed the real details (thin hangers meeting in V's at glazed
+- Get CURRENT construction photos (UrbanToronto/skyrisecities CDN, etc.). A first pass built from articles
+  alone is often far off; the photos showed the real details (thin hangers meeting in V's at glazed
   corners, pale faceted pilasters, 18-floor blocks of 6-floor tiers, 2-storey breaks).
 - The browser pane can't zoom into a region. To inspect an image, replace the page body via javascript with an
   oversized <img> offset by negative left/top, then screenshot (retry once if the first screenshot times out).

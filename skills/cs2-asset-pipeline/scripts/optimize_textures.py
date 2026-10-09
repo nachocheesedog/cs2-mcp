@@ -7,8 +7,8 @@
 # textures on one stack have the same size. Otherwise the material is silently left out. A package whose materials
 # are ALL left out gets an EMPTY StreamingData~/TS512_MB3.MidMips, and an empty cache makes every subscriber's game
 # crash at start (FATAL "Can't test if a material is a duplicate with registered materials",
-# AtlasMaterialsGrouper.IsDuplicate: m_RegisteredMaterials.Count == 0). A published vehicle pack shipped like that (64 px
-# constant maps, 2048/1024 mix).
+# AtlasMaterialsGrouper.IsDuplicate: m_RegisteredMaterials.Count == 0). Typical causes: 64 px constant maps, or a
+# 2048/1024 size mix on one material.
 # So: never shrink a map below its material's size, never below 512, and keep every map of one material the same size.
 # Local (unpackaged) imports do not show the problem - it appears only in the published package.
 #

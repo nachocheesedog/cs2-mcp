@@ -601,7 +601,7 @@ def _build_plan(plan_id, plan, a):
             blocks = rpc("zone_blocks", {"xmin": ar[0], "zmin": ar[1], "xmax": ar[2], "zmax": ar[3], "limit": 20000}).get("blocks", [])
             out["unzoned_cells"] = sum(str(b.get("cells", "")).count(".") for b in blocks)
             if out["unzoned_cells"]:
-                out["next"] = ("zone the new frontage (cs2_zone_along / cs2_zone with the user's palette) once the user says so - "
+                out["next"] = ("zone the new frontage (cs2_zone_along / cs2_zone with your zoning palette) when you're ready - "
                                "unzoned cells stay empty grass")
     except Exception: pass
     return out

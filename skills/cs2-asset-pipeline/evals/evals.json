@@ -4,7 +4,7 @@
   {
    "id": 1,
    "name": "invisible-asset-diagnosis",
-   "prompt": "ok so I exported my new CS2 building NA_UnionStation from blender with the default fbx export settings and imported it with the mcp. in game I can place it and I see the lot outline but there's literally no building there. also I noticed the windows glow like crazy in the daytime on my other asset. what's going on and how do I fix both?",
+   "prompt": "ok so I exported my new CS2 building NA_MyStation from blender with the default fbx export settings and imported it with the mcp. in game I can place it and I see the lot outline but there's literally no building there. also I noticed the windows glow like crazy in the daytime on my other asset. what's going on and how do I fix both?",
    "expected_output": "Diagnoses metre-vs-centimetre FBX scale (importer x0.01, ignores UnitScaleFactor) with the exact Blender export fix, re-import with preset None (main menu if loaded); explains emissive map glows day and night, set window emissive ~0 and use a separate _Win.fbx for night windows.",
    "files": [],
    "assertions": [
@@ -18,7 +18,7 @@
   {
    "id": 2,
    "name": "new-tower-full-plan",
-   "prompt": "let's do the next one - The Well's office tower at 8 Spadina Ave / 486 Front St W in Toronto. give me the full plan from start to having it in my city: what you'll research, how you'll structure the blender project, the export steps, the folder layout, and the exact MCP tool calls for importing and setting it up as an always-available office signature building. don't start building yet, just write the plan to a file.",
+   "prompt": "let's do the next one - a 30-storey office tower in a downtown core. give me the full plan from start to having it in my city: what you'll research, how you'll structure the blender project, the export steps, the folder layout, and the exact MCP tool calls for importing and setting it up as an always-available office signature building. don't start building yet, just write the plan to a file.",
    "expected_output": "Staged plan: research + confirm layout with user; project under ~/blender; cs2/ asset folder + cs2_build; cm FBX, one material atlas, _Win file, LODs, street side -Y, plaza base, icon+meta; validate; first import from a loaded city with a creating preset; configure copy_from office signature, remove Unlockable, clear template icon, icon/title/description; place without moving camera; ask before publishing.",
    "files": [],
    "assertions": [

@@ -6,8 +6,9 @@ code the Asset Editor's buttons call. It exposes an HTTP bridge at `127.0.0.1:17
 and `assets.py` does validate, import and meta handling.
 
 ## Code-modding guidelines (for work on the CS2MCP mod)
-Condensed from the C:S Modding Discord knowledgebase + the community "CS2 Modding Instructions". The highlights
-that matter for the CS2MCP mod:
+Condensed from the **Cities: Skylines Modding** Discord knowledgebase and the community-maintained "CS2 Modding
+Instructions" (credit to their authors and maintainers; read the originals there for the full guidance). The
+highlights that matter for the CS2MCP mod:
 - C# 9 with Mod.props' target framework (net48); keep `.pubxml` in sync after toolchain updates.
 - Prefer ECS systems over Harmony (Lib.Harmony 2.2.2 with a unique ID if unavoidable).
 - Dispose Native collections by lifetime: Temp / TempJob at the end of OnUpdate or `Dispose(jobHandle)`; Persistent in
@@ -17,8 +18,8 @@ that matter for the CS2MCP mod:
 - The upgrade panel reads `Assets.UPGRADE_NAME/UPGRADE_DESCRIPTION[<name>]` for ServiceUpgrade prefabs (mod 0.31
   writes them).
 
-Also load the `cs2-modding@csmodding` plugin skills (if installed) (cs2-modding, cs2-modding-setup, cs2-mod-project,
-cs2-modding-ui) before changing mod code: they are verified against the decompiled game (1.6.2f1).
+If you have the community CS2 modding skills for Claude Code installed (cs2-modding, cs2-modding-setup,
+cs2-mod-project, cs2-modding-ui), load them before changing mod code.
 
 ## Decompiling more
 ```bash

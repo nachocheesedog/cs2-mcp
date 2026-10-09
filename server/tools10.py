@@ -7,7 +7,7 @@ Claude designs the layout; these give the facts that design needs and catch what
                   relative to ground): every movement between the site's approaches - reachable, path length, detour ratio;
                   dead ends and one-way traps; per road the tightest radius vs its design speed and the steepest grade;
                   merge / diverge angles; weaving length between an on-ramp merge and the next off-ramp split; lane balance
-                  (auxiliary lane before an off-ramp / after an on-ramp - the user's standing rule); vertical clearance where
+                  (auxiliary lane before an off-ramp / after an on-ramp - layout rule); vertical clearance where
                   roads cross without a junction. Lane directions come from mod 0.27 (lanes=true); older mods: inferred
                   from the type name ('Oneway' = one way, start -> end) and flagged as inferred.
 Generic: thresholds are parameters; nothing is built.

@@ -217,7 +217,7 @@ def forecast(w, draft=None, widths=None, res=4.0, max_slope=0.40, hotspots=8, ma
         return [{"pos": [round((i + 0.5) * 60), round((j + 0.5) * 60)], key: n} for (i, j), n in cl.most_common(hotspots)]
 
     # holes (v0.27b): land inside a block that no road's 6-cell zoning reaches - enclosed by roads, not open to water or
-    # the edge of the area. The user's rule: none of these inside a grid.
+    # the edge of the area. Layout rule: none of these inside a grid.
     free = ~reach & ~in_corridor & ~water & ~steep & ~barrier
     labl, nlab = ndimage.label(free)
     holes = []

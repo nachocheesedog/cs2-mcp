@@ -2,7 +2,7 @@
 # meshes for a texture-only change (a full re-import of a big pack takes far longer). A .Surface stores each
 # texture as <slot name> 0xFF <16-byte GUID>. Main surfaces take the reference asset's main-surface GUIDs, _LOD1/_LOD2 surfaces
 # its LOD1 surface GUIDs (the 512 px palette); _Win / _Gls surfaces are left alone. Then run dedupe_textures.py <prefix>.
-#   python texture_swap.py <reference asset name, e.g. NA_PKHouseA_L1_1x2> [--prefix NA_PK] [--dry]
+#   python texture_swap.py <reference asset name, e.g. NA_MyPackHouseA_L1_1x2> [--prefix NA_MyPack] [--dry]
 import os, re, glob, sys, shutil
 DB = os.path.join(os.environ["USERPROFILE"], r"AppData\LocalLow\Colossal Order\Cities Skylines II\ImportedData")
 BK = os.path.join(os.environ["USERPROFILE"], r"blender\_cs2_asset_backups\_texture_swap_backup")

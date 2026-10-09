@@ -44,11 +44,11 @@ The wiki's per-sub-mesh rules (UVs, water/glass, LOD2 windows) are in `wiki_buil
 - Maps:
   - `BaseColor`: sRGB.
   - `MaskMap`: R = metallic, **G = clear coat** (NOT ambient occlusion), B = 0, A = gloss/smoothness.
-    G = 1 puts a glassy lacquer on everything, whatever the smoothness (an airport asset shipped with G = 1 and all its
+    G = 1 puts a glassy lacquer on everything, whatever the smoothness (an asset exported with G = 1 on all its
     ground textures looked too glassy). Keep G = 0 except for glossy paint or glass. Vanilla
     surface masks exported for texture cells must get their G and B zeroed too.
   - Native grass on a building mesh (roof lawns, planters): a `<Name>[_LODn]_Gra.fbx` sub-mesh with no material.
-    The game draws it with its Grass template (BH/GraShader), as InternationalAirport01 does its lawns. The stock UVs
+    The game draws it with its Grass template (BH/GraShader), as the vanilla airport does its lawns. The stock UVs
     run at about 0.0055 per metre (~183 m per unit); cut the faces on that grid so the UVs stay in [0, 1].
   - `ControlMask`: RGB = colour-variation masks 1-3 (0 = none; see `configure.md` ColorProperties). A = SnowRemove per
     the wiki: white = NO snow, black = full snow. It isn't implemented yet (wiki 1.5.2), so our A = 1 default is harmless.
@@ -139,7 +139,7 @@ Change these:
 Keep unchanged: the FBX settings, `_Win` as its own file, and zero window emissive.
 
 ## Package size: textures must stay VIRTUAL-TEXTURE SAFE (hard lesson)
-**A published package crashed EVERY subscriber's game at startup** after a texture "diet":
+**A package whose textures were shrunk (a texture "diet") crashes EVERY subscriber's game at startup:**
 `FATAL: Can't test if a material is a duplicate with registered materials`.
 - **Why:** a Paradox package converts every surface to virtual texturing (512 px tiles). `SurfaceAsset.Save(vt)` SKIPS a
   material if any of its maps is under 512 px, or if the maps of one stack differ in size. Our 64 px constant maps,
@@ -183,7 +183,7 @@ Keep unchanged: the FBX settings, `_Win` as its own file, and zero window emissi
   in the exporter's window-mesh step.
 
 ## Vehicles: build the game body, don't decimate it
-A published car pack looked "wonky" in game: smushed, no clean straight lines or pillars, windows not flat. Cause: the ~2,000-tri game bodies were a voxel depth hull of the full model, collapse-decimated. Textured
+A car pack whose game bodies are collapse-decimated looks wrong in game: smushed, no clean straight lines or pillars, windows not flat. Cause: ~2,000-tri game bodies made as a voxel depth hull of the full model, collapse-decimated. Textured
 Cycles renders hid it (the baked normal map repaints the shading); a **plain clay render of the exported FBX**
 (e.g. a `clay_fbx.py` helper with `--wire --flat`) showed lumpy soap bars. Always clay-check game meshes.
 What works (a `body_fields.py` -> `body_build.py` -> `export_cars.py` chain):

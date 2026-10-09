@@ -1,7 +1,7 @@
 # Share identical textures between imported assets (game CLOSED). Every import stores its own copy of the textures, so a
 # pack of N assets on one shared atlas carries N identical 5-map sets (a 100-asset pack: 530 files / 2.96 GB, 5 unique /
 # 28 MB). This points every .Surface at ONE canonical .Texture per identical content and moves the duplicates to a backup.
-#   python dedupe_textures.py <prefix> [backup_dir] [--dry]      e.g.  python dedupe_textures.py NA_PK
+#   python dedupe_textures.py <prefix> [backup_dir] [--dry]      e.g.  python dedupe_textures.py NA_MyPack
 # .Surface stores each texture as 0xFF + 16 GUID bytes; the GUID bytes are the texture's .cid hex with the two nibbles of
 # every byte swapped (verified: cid 4ed7c928... -> bytes e4 7d 9c 82 ...).
 import sys, os, glob, hashlib, shutil, collections
