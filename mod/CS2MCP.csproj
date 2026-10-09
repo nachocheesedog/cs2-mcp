@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- CS2MCP: a Cities: Skylines II code mod exposing a local-only HTTP bridge (127.0.0.1) that an MCP server talks to.
+       Compiled directly against the game's own managed assemblies (no toolchain / no Burst needed: the mod uses no jobs,
+       SystemAPI or IJobEntity code generation). Build: dotnet build -c Release  -> deploys to the local Mods folder. -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>CS2MCP</AssemblyName>
+    <RootNamespace>CS2MCP</RootNamespace>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoStdLib>true</NoStdLib>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- Non-default install: dotnet build -c Release -p:CS2Managed="D:\Games\Cities Skylines II\Cities2_Data\Managed" -->
+    <CS2Managed Condition="'$(CS2Managed)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Cities Skylines II\Cities2_Data\Managed</CS2Managed>
+    <FrameworkPathOverride>$(CS2Managed)</FrameworkPathOverride>
+    <CS2ModsDir Condition="'$(CS2ModsDir)' == ''">$(USERPROFILE)\AppData\LocalLow\Colossal Order\Cities Skylines II\Mods\CS2MCP</CS2ModsDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="mscorlib"><HintPath>$(CS2Managed)\mscorlib.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="netstandard"><HintPath>$(CS2Managed)\netstandard.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System"><HintPath>$(CS2Managed)\System.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System.Core"><HintPath>$(CS2Managed)\System.Core.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Game"><HintPath>$(CS2Managed)\Game.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Colossal.Core"><HintPath>$(CS2Managed)\Colossal.Core.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Colossal.IO.AssetDatabase"><HintPath>$(CS2Managed)\Colossal.IO.AssetDatabase.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Colossal.UI"><HintPath>$(CS2Managed)\Colossal.UI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Colossal.PSI.Common"><HintPath>$(CS2Managed)\Colossal.PSI.Common.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Colossal.Localization"><HintPath>$(CS2Managed)\Colossal.Localization.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Colossal.AssetPipeline"><HintPath>$(CS2Managed)\Colossal.AssetPipeline.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Colossal.Mathematics"><HintPath>$(CS2Managed)\Colossal.Mathematics.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Colossal.Collections"><HintPath>$(CS2Managed)\Colossal.Collections.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Colossal.Logging"><HintPath>$(CS2Managed)\Colossal.Logging.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.Entities"><HintPath>$(CS2Managed)\Unity.Entities.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.Mathematics"><HintPath>$(CS2Managed)\Unity.Mathematics.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.Collections"><HintPath>$(CS2Managed)\Unity.Collections.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.Burst"><HintPath>$(CS2Managed)\Unity.Burst.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(CS2Managed)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(CS2Managed)\UnityEngine.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.ScreenCaptureModule"><HintPath>$(CS2Managed)\UnityEngine.ScreenCaptureModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.ImageConversionModule"><HintPath>$(CS2Managed)\UnityEngine.ImageConversionModule.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <Target Name="DeployToMods" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <MakeDir Directories="$(CS2ModsDir)" />
+    <Copy SourceFiles="$(OutDir)CS2MCP.dll" DestinationFolder="$(CS2ModsDir)" />
+    <Message Importance="high" Text="CS2MCP deployed to $(CS2ModsDir)" />
+  </Target>
+</Project>

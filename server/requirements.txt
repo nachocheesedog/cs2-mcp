@@ -1,0 +1,6 @@
+# The MCP protocol layer and bridge client use only the standard library.
+# The planners and the map renderer need these:
+numpy>=1.24
+scipy>=1.10
+Pillow>=10.0
+contourpy>=1.2

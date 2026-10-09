@@ -1,0 +1,52 @@
+{
+ "skill_name": "cs2-asset-pipeline",
+ "evals": [
+  {
+   "id": 1,
+   "name": "invisible-asset-diagnosis",
+   "prompt": "ok so I exported my new CS2 building NA_UnionStation from blender with the default fbx export settings and imported it with the mcp. in game I can place it and I see the lot outline but there's literally no building there. also I noticed the windows glow like crazy in the daytime on my other asset. what's going on and how do I fix both?",
+   "expected_output": "Diagnoses metre-vs-centimetre FBX scale (importer x0.01, ignores UnitScaleFactor) with the exact Blender export fix, re-import with preset None (main menu if loaded); explains emissive map glows day and night, set window emissive ~0 and use a separate _Win.fbx for night windows.",
+   "files": [],
+   "assertions": [
+    "Identifies metre-vs-centimetre FBX scale (importer scales x0.01) as the cause of the invisible building",
+    "Gives the Blender export fix: apply_scale_options FBX_SCALE_NONE with global_scale 1.0",
+    "Says to re-import with preset None (keeping the config), noting the main-menu requirement if the city has it loaded",
+    "Explains the Emissive map glows day and night and says to set window emissive to ~0",
+    "Recommends a separate <Name>_Win.fbx file for night-only window lighting"
+   ]
+  },
+  {
+   "id": 2,
+   "name": "new-tower-full-plan",
+   "prompt": "let's do the next one - The Well's office tower at 8 Spadina Ave / 486 Front St W in Toronto. give me the full plan from start to having it in my city: what you'll research, how you'll structure the blender project, the export steps, the folder layout, and the exact MCP tool calls for importing and setting it up as an always-available office signature building. don't start building yet, just write the plan to a file.",
+   "expected_output": "Staged plan: research + confirm layout with user; project under ~/blender; cs2/ asset folder + cs2_build; cm FBX, one material atlas, _Win file, LODs, street side -Y, plaza base, icon+meta; validate; first import from a loaded city with a creating preset; configure copy_from office signature, remove Unlockable, clear template icon, icon/title/description; place without moving camera; ask before publishing.",
+   "files": [],
+   "assertions": [
+    "Project lives in its own local project folder (e.g. ~/blender/<project>) with cs2/ and cs2_build/ subfolders",
+    "Plan confirms facade layout / floor count with the user before detailed modelling",
+    "FBX exported in centimetres (FBX_SCALE_NONE, global_scale 1)",
+    "Night windows as a separate <Name>_Win.fbx with no material",
+    "Street side oriented to Blender -Y at export",
+    "Paved ground surface over the whole lot in every LOD",
+    "Build-menu icon + title + description (meta json / icon png in cs2_build)",
+    "First import done from a loaded city with a creating preset (not at the main menu)",
+    "Configure copies an office signature, removes Unlockable and clears the template's icon/unlock image",
+    "Says it won't move the camera without asking and/or will ask before publishing"
+   ]
+  },
+  {
+   "id": 3,
+   "name": "update-loaded-asset",
+   "prompt": "I tweaked the podium colours in the liberty house blender file (just the materials). the city is loaded right now with liberty house placed in it. push the update into the game please - tell me exactly the steps you'll run and what I need to do, in order.",
+   "expected_output": "Rerun the pipeline from the atlas step (make_atlas -> export_build -> lod_render -> compose_lod_atlas -> lod_build_export) since colours live in the atlas + LOD atlases; validate; user must quit to main menu because the loaded city locks the .Geometry; import with preset None (keeps config, reapplies icon/meta); user reloads city; verify via screenshot without moving camera.",
+   "files": [],
+   "assertions": [
+    "Reruns the pipeline from the atlas step including the LOD atlas steps (not just re-exporting FBX)",
+    "Runs cs2_asset_validate before importing",
+    "User must quit to the main menu before the import because the loaded city locks the .Geometry file",
+    "Imports with preset None so the existing configuration is kept",
+    "User reloads the city afterwards and the result is verified (screenshot without moving the camera)"
+   ]
+  }
+ ]
+}

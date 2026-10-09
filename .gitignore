@@ -1,0 +1,25 @@
+# build output
+mod/bin/
+mod/obj/
+*.dll
+*.pdb
+
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# runtime state written by the server
+server/settings.json
+server/snapshots/
+
+# local reference material (decompiled game code must never be committed)
+ref/
+*.decompiled.cs
+
+# editor / OS
+.vs/
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
