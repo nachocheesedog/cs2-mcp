@@ -8,7 +8,7 @@ World coordinates are CS2's: x/z horizontal in metres, y up. Zoning cells are 8 
 import base64, json, math, os, sys, time, urllib.request, urllib.error
 import survey, tools2, tools3, tools4, tools5, tools6, tools7, tools8, tools9, tools10, tools11, tools13, tools14, tools15, tools16, assets
 
-BRIDGE = "http://127.0.0.1:17654"
+BRIDGE = os.environ.get("CS2MCP_BRIDGE", "http://127.0.0.1:17654")
 PROTOCOL = "2024-11-05"
 CELL = 8.0
 
@@ -1080,8 +1080,8 @@ TOOLS = [
      "pitch) and wait settle_s seconds (default 2) for it to arrive. max_width scales the returned JPG (default 1280, max 3840). "
      "Mod 0.30: clean=true = a proper game shot like Photo Mode's 'Take photo' - no UI, no notification icons, overlays, road "
      "names or route lines (restored afterwards); frames = frames to wait before capturing (default 30, lets TAA settle); "
-     "save_png = path to keep the full-resolution PNG (mod 0.33: a .png under %USERPROFILE%\blender, %USERPROFILE%\cs2-mcp, the game's "
-     "Screenshots folder or %TEMP%; more roots in ModsData\CS2MCP\save_png_roots.txt); supersize = 1..4x render scale. Combine with cs2_photo_mode for grading.",
+     r"save_png = path to keep the full-resolution PNG (mod 0.33: a .png under %USERPROFILE%\blender, %USERPROFILE%\cs2-mcp, the game's "
+     r"Screenshots folder or %TEMP%; more roots in ModsData\CS2MCP\save_png_roots.txt); supersize = 1..4x render scale. Combine with cs2_photo_mode for grading.",
      {"type": "object", "properties": {"x": {"type": "number"}, "z": {"type": "number"}, "zoom": {"type": "number"},
                                        "yaw": {"type": "number"}, "pitch": {"type": "number"},
                                        "settle_s": {"type": "number"}, "max_width": {"type": "integer"},
