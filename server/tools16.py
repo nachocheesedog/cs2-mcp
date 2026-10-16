@@ -367,6 +367,134 @@ def check_outline(rpc, area, poly, refused=()):
     return out
 
 
+# ----------------------------------------------------------------------------- sites (v0.46, after the first live test)
+def has_outline(a):
+    return bool(a.get("polygon")) or a.get("center") is not None or all(a.get(k) is not None for k in ("xmin", "zmin", "xmax", "zmax"))
+
+
+def lattice_dims(s, widths, a):
+    """(pitch_u, pitch_v, width of the first cross street) - what _grid_plan will use for this spec."""
+    lw = widths[s["local_type"]]
+    pitch_u = a.get("pitch_u") or lw + 2 * s["zoning_depth_cells"] * 8
+    pitch_v = a.get("pitch_v") or s["block_length_cells"] * 8 + lw
+    first_w = widths[s["arterial_type"]] if (s.get("arterial_type") and s.get("arterial_every")) else lw
+    return pitch_u, pitch_v, first_w
+
+
+def find(rpc, a, api, s, widths, **kw):
+    import sites
+    pitch_u, pitch_v, first_w = lattice_dims(s, widths, a)
+    return sites.find_sites(rpc, local_type=s["local_type"], widths=widths, first_w=first_w, pitch_u=pitch_u, pitch_v=pitch_v,
+                            max_grade=a.get("max_grade", 0.15), **kw)
+
+
+def site_brief(st):
+    out = {k: st[k] for k in ("rank", "kind", "anchor", "street", "free_share", "free_ha", "overlaps_district") if st.get(k) is not None}
+    return out
+
+
+def _site_text(st):
+    at = st.get("anchor")
+    return (f"the dead end of a {st.get('street')} at {at}" if st.get("kind") == "dead_end"
+            else f"a T off a {st.get('street')} at {at}")
+
+
+def _found_text(found):
+    f = found or {}
+    parts = [f"{f.get('dead_ends', 0)} dead ends and {f.get('street_sides', 0)} street sides looked at",
+             f"{f.get('free_land_beyond', 0)} with free land beyond", f"{f.get('spine_ok', 0)} with a clear way in"]
+    bad = {k[6:].replace("_", " "): v for k, v in f.items() if k.startswith("spine_") and k != "spine_ok"}
+    if bad: parts.append("blocked by " + ", ".join(f"{k} {v}" for k, v in sorted(bad.items(), key=lambda kv: -kv[1])))
+    if f.get("too_little_free_land"): parts.append(f"{f['too_little_free_land']} with too little free land")
+    if f.get("refused_by_game"): parts.append(f"{f['refused_by_game']} refused by the game's dry run (city limits / money)")
+    return "; ".join(parts)
+
+
+def no_grid_reason(st):
+    d = st.get("diag") or {}
+    if st.get("dropped_unconnected"):
+        j = {k: v for k, v in (d.get("joins") or {}).items() if not k.startswith("joined")}
+        detail = ", ".join(f"{k.replace('_', ' ')} {v}" for k, v in j.items())
+        return ("the outline reaches no existing street within a block or two" + (f" ({detail})" if detail else "") +
+                " - try site='auto' (free land next to a dead end or an empty street side), move the outline next to a "
+                "street, or pass connected_only=false and join it up yourself")
+    fs, pf = d.get("free_share"), d.get("piece_fails") or {}
+    return ("no buildable land in the outline" + (f": {int(round(fs * 100))}% of it is free for a street" if fs is not None else "") +
+            (" (" + ", ".join(f"{k.replace('_', ' ')} {v}" for k, v in pf.items()) + ")" if pf else "") +
+            " - water, steep ground, existing zoning or buildings; try site='auto'")
+
+
+def plan_on_sites(rpc, a, api, s, widths, g0, site_arg, attempts=4):
+    """site = a site from cs2_district_sites, or 'auto' (find them here: near the camera / `near` first). Plans the
+    sites in order until one gives a grid. -> (plan, area, extra, site, tried, found) / (None, ..., tried, found)"""
+    found = None
+    if isinstance(site_arg, dict):
+        cands = [site_arg]
+    else:
+        near = a.get("near")
+        if near is None or near == "camera":
+            try: near = api["camera_ground"]()
+            except Exception: near = None
+        res = find(rpc, a, api, s, widths, size=float(a.get("size", 600)), count=attempts, near=near, radius=a.get("radius"))
+        res.pop("_land", None)
+        found = dict(res.get("found") or {})
+        cands = [x for x in res["sites"] if (x.get("check") or {}).get("ok", True)]
+    tried = []
+    for st in cands[:attempts]:
+        lat = st["lattice"]
+        g = dict(g0, polygon=st["polygon"], angle_deg=lat["angle_deg"], origin=lat["origin"], u_phase=lat.get("u_phase", 0.0),
+                 v_phase=lat.get("v_phase", 0.0))
+        if st.get("seed"): g["seed"] = st["seed"]
+        try:
+            plan, area, extra = api["grid_plan"](g)
+        except ValueError as e:
+            tried.append({"rank": st.get("rank"), "anchor": st.get("anchor"), "error": str(e)[:160]}); continue
+        stt = plan["stats"]
+        tried.append({"rank": st.get("rank"), "kind": st.get("kind"), "anchor": st.get("anchor"), "grid_segments": stt["grid_segments"],
+                      "joins": stt.get("to_existing"), "diag": stt.get("diag")})
+        if stt["grid_segments"]: return plan, area, extra, st, tried, found
+    return None, None, None, None, tried, found
+
+
+def join_from_anchor(rpc, a, api, s, widths, g, poly):
+    """The outline is free land but its grid reached no street: lay the grid out from a dead end / an empty street side
+    that reaches into the outline instead. -> (plan, area, extra, site) or None"""
+    try:
+        res = find(rpc, a, api, s, widths, polygon=poly, connect_beyond=float(g.get("connect_beyond_m") or 250.0), count=3, check=False)
+    except Exception:
+        return None
+    res.pop("_land", None)
+    for st in res["sites"]:
+        lat = st["lattice"]
+        g2 = dict(g, angle_deg=lat["angle_deg"], origin=lat["origin"], u_phase=lat["u_phase"], v_phase=lat["v_phase"])
+        try:
+            plan, area, extra = api["grid_plan"](g2)
+        except ValueError:
+            continue
+        if plan["stats"]["grid_segments"]: return plan, area, extra, st
+    return None
+
+
+def district_sites(rpc, a, api):
+    """cs2_district_sites: ranked places for a new district (+ a map)."""
+    import sites
+    s = spec_of(a); widths = api["widths"]()
+    notes = check_road_types(s, widths, [k for k in ("local_type", "arterial_type") if a.get(k)])
+    near = a.get("near")
+    if near == "camera": near = api["camera_ground"]()
+    res = find(rpc, a, api, s, widths, size=float(a.get("size", 600)), count=int(a.get("count", 5)), near=near,
+               radius=a.get("radius"), check=a.get("check", True))
+    land = res.pop("_land", None)
+    res = dict({"preset": s["preset"], "roads": {"local": s["local_type"], "arterial": s.get("arterial_type")}}, **res)
+    if notes: res["notes"] = notes
+    if not res["sites"]: res["reason"] = res.get("reason") or "no free land next to a street: " + _found_text(res.get("found"))
+    else: res["next"] = "cs2_build_district site=<one of these sites> (preview=true to look first), or site='auto'"
+    if a.get("map", True) and land is not None:
+        img = sites.render(land, res["sites"], px=int(a.get("px", 900)))
+        return api["image_result"](survey.save(img, time.strftime("district_sites_%Y%m%d_%H%M%S.png")), "image/png", json.dumps(res))
+    return res
+
+
 # ----------------------------------------------------------------------------- build
 def build_district(rpc, a, api):
     import pave
@@ -382,36 +510,62 @@ def build_district(rpc, a, api):
         area = survey.Area(*plan["area"])
     else:
         s = spec_of(a)
-        notes = check_road_types(s, api["widths"](), [k for k in ("local_type", "arterial_type") if a.get(k)])
-        poly = outline(a, api)
-        g = {"polygon": poly, "local_type": s["local_type"], "arterial_type": s.get("arterial_type"), "arterial_every": s["arterial_every"],
-             "block_length_cells": s["block_length_cells"], "zoning_depth_cells": s["zoning_depth_cells"],
-             "max_grade": a.get("max_grade", 0.15), "connected_only": a.get("connected_only", True),
-             "connect_beyond_m": a.get("connect_beyond_m", 250.0)}
-        for k in ("angle_deg", "origin", "u_phase", "v_phase", "match_radius", "seed", "pitch_u", "pitch_v"):
-            if a.get(k) is not None: g[k] = a[k]
-        try:
-            plan, area, extra = api["grid_plan"](g)
-        except ValueError as e:
-            if "lattice" not in str(e) or "angle_deg" in g: raise
-            g["angle_deg"] = poly_angle(poly)                         # no streets nearby to line up with
-            notes.append(f"no straight streets nearby to line up with: grid angle {g['angle_deg']} deg from the outline")
-            plan, area, extra = api["grid_plan"](g)
+        widths = api["widths"]()
+        notes = check_road_types(s, widths, [k for k in ("local_type", "arterial_type") if a.get(k)])
+        g0 = {"local_type": s["local_type"], "arterial_type": s.get("arterial_type"), "arterial_every": s["arterial_every"],
+              "block_length_cells": s["block_length_cells"], "zoning_depth_cells": s["zoning_depth_cells"],
+              "max_grade": a.get("max_grade", 0.15), "connected_only": a.get("connected_only", True),
+              "connect_beyond_m": a.get("connect_beyond_m", 250.0)}
+        for k in ("match_radius", "pitch_u", "pitch_v"):
+            if a.get(k) is not None: g0[k] = a[k]
+        site_arg = a.get("site")
+        if site_arg is None and not has_outline(a): site_arg = "auto"   # no outline: free land next to the streets
+        site, tried, found, lat_mode = None, [], None, a.get("lattice", "snap")
+        if site_arg not in (None, False, "none"):
+            plan, area, extra, site, tried, found = plan_on_sites(rpc, a, api, s, widths, g0, site_arg)
+            if plan is None:
+                why = (f"none of the {len(tried)} sites found drafted a grid (see sites_tried: diag says why)" if tried else
+                       "no site the game accepts with free land next to a street: " + _found_text(found)) if found is not None \
+                    else "the site gave no buildable grid (see sites_tried: diag says why)"
+                out = {"built": False, "preset": s.get("preset"), "roads": {"local": s["local_type"], "arterial": s.get("arterial_type")},
+                       "reason": why, "sites_tried": tried}
+                if found is not None: out["found"] = found
+                if notes: out["notes"] = notes
+                return out
+            poly = site["polygon"]; lat_mode = a.get("lattice", "off")      # the site's lattice is exact by construction
+        else:
+            poly = outline(a, api)
+            g = dict(g0, polygon=poly)
+            for k in ("angle_deg", "origin", "u_phase", "v_phase", "seed"):
+                if a.get(k) is not None: g[k] = a[k]
+            try:
+                plan, area, extra = api["grid_plan"](g)
+            except ValueError as e:
+                if "lattice" not in str(e) or "angle_deg" in g: raise
+                g["angle_deg"] = poly_angle(poly)                         # no streets nearby to line up with
+                notes.append(f"no straight streets nearby to line up with: grid angle {g['angle_deg']} deg from the outline")
+                plan, area, extra = api["grid_plan"](g)
+            if not any(x.get("phase") == "grid" for x in plan["segments"]) and plan["stats"].get("dropped_unconnected") \
+                    and g["connected_only"] and not any(a.get(k) is not None for k in ("angle_deg", "origin")):
+                alt = join_from_anchor(rpc, a, api, s, widths, g, poly)      # lay the grid out from a dead end / an empty side
+                if alt:
+                    plan, area, extra, site = alt; lat_mode = a.get("lattice", "off")
+                    notes.append(f"joined via {_site_text(site)}: the grid laid out from there")
         lat, pitch = extra["lattice"], extra["pitch_m"]
         opts = {k: a[k] for k in OPT_KEYS if k in a}
         pid = new_pid(api)
         plan["area"] = [area.x0, area.z0, area.x1, area.z1]
-        plan["district_spec"] = {"spec": s, "polygon": poly, "lattice": lat, "pitch_m": pitch, "opts": opts, "notes": notes}
+        plan["district_spec"] = {"spec": s, "polygon": poly, "lattice": lat, "pitch_m": pitch, "opts": opts, "notes": notes,
+                                 "lattice_mode": lat_mode}
+        if site: plan["district_spec"]["site"] = site_brief(site)
     grid = [x for x in plan["segments"] if x.get("phase") == "grid"]
     head = {"plan_id": pid, "preset": s.get("preset"), "roads": {"local": s["local_type"], "arterial": s.get("arterial_type")},
             "stats": plan["stats"]}
+    if plan["district_spec"].get("site"): head["site"] = plan["district_spec"]["site"]
+    if not a.get("plan_id") and len(tried) > 1: head["sites_tried"] = tried
     if notes: head["notes"] = notes
     if not grid:
-        st = plan["stats"]
-        why = ("the outline reaches no existing street within a block or two - move it next to a street, or pass "
-               "connected_only=false and join it up yourself") if st.get("dropped_unconnected") else \
-              "no buildable land in the outline (water, steep ground, existing zoning or buildings)"
-        return dict(head, built=False, reason=why)
+        return dict(head, built=False, reason=no_grid_reason(plan["stats"]))
     zones, theme, missing = zone_plan(rpc, s["zones"], poly, opts.get("theme")) if s["zones"] else ({}, None, [])
     head["zones"] = zones
     if theme: head["theme"] = theme
@@ -432,7 +586,7 @@ def build_district(rpc, a, api):
     rep, journal = dict(head), {"services": [], "district": None}
     try:
         if not plan.get("snapped"):                               # snap once and keep the snapped shapes: what is built
-            snapped, rep_lat = api["lattice"](grid, {"lattice": a.get("lattice", "snap")})
+            snapped, rep_lat = api["lattice"](grid, {"lattice": a.get("lattice", plan["district_spec"].get("lattice_mode", "snap"))})
             it = iter(snapped)
             plan["segments"] = [next(it) if x.get("phase") == "grid" else x for x in plan["segments"]]
             plan["snapped"] = True

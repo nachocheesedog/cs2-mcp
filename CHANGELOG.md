@@ -21,6 +21,16 @@ where it can, so a newer server works with an older mod.
   (default 0 for `cs2_district_grid`, 250 m for `cs2_build_district`).
 - `skills/cs2-city-building`: a fast-path section; `docs/DISTRICT_BUILDER.md`; `server/test_build_district.py` runs the
   whole flow against a fake game.
+- After the first live test (a lived-in city: no grid drafted anywhere — the squares it tried could not reach a street
+  between the houses): `cs2_district_sites` finds free land next to the streets — straight on from a dead end or past
+  an empty street side, only the land reachable without crossing a highway, track or water, the way in checked with
+  the planner's own rules, each site dry-run against city limits and money — with a numbered map.
+  `cs2_build_district` with no outline uses it (`site='auto'`, nearest the camera first) and lays the grid out from the
+  join, so it is connected by construction; an outline whose grid reaches no street is laid out again from a dead end
+  that reaches into it. `pave.plan_fill`: a lattice line running straight into a dead end continues that street, and
+  `stats.diag` says why nothing could be built (free share, pieces that fit, why each join failed).
+  `server/test_sites.py`: a lived-in fake town (houses on every street, highway, railway, river, hills, city limits,
+  also turned 33°).
 
 ## 0.38 – 0.45 — skills, precision road tools, services, brands
 - **Skills library** (`skills/`): four Claude Code skills — city building, the Blender → game asset pipeline, Blender

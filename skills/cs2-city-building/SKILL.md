@@ -16,9 +16,12 @@ When the user wants a new area built ("build a district here", "fill this land w
 streets, zone and place services step by step - that is dozens of round trips and the session drifts into polishing
 details. Use `cs2_build_district` (docs/DISTRICT_BUILDER.md):
 
-1. Pick the outline once: `polygon` (or `center` + `size`) on free land that touches or nearly touches existing
-   streets (connectors may leave it by `connect_beyond_m`, default 250). One `cs2_map` of the area is enough to choose
-   it - no screenshots.
+1. Where: when the user names no place, give no outline - the tool picks free land next to the streets itself
+   (`site='auto'`: straight on from a dead end or past an empty street side, nearest the camera, checked against city
+   limits and money). To show options first, one `cs2_district_sites` call (a numbered map) and pass the chosen site
+   (`site=<that site object>`). When the user names a place, give `polygon` (or `center` + `size`) on free land that
+   touches or nearly touches existing streets (connectors may leave it by `connect_beyond_m`, default 250); if its
+   grid reaches no street, the tool lays it out from a dead end that reaches into it. No screenshots to choose.
 2. One call: `cs2_build_district polygon=... preset=suburb|residential|downtown|office|industrial name=...
    services=[...]`. Add `preview=true` only when the user wants to see the draft first; then build it with
    `plan_id`. The tool pauses the sim, builds streets -> zero-crack flags -> services -> zoning -> district, restores

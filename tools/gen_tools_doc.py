@@ -11,7 +11,7 @@ CATEGORIES = [
     ("Roads and networks", "place_roads place_grid place_circle place_path place_pair place_lines place_arcs extend_lines offset_road rim_road ramp trim replace_roads district_grid connect_options build_plan remove_plan probe place_piers place_along_shore building_access design_path network_check site_movements road_align road_snapshot road_restore road_profile node_detail highway_fork path_test"),
     ("Zoning", "zone zone_along zone_palette rezone rezone_buildings zone_snapshot zoning_check zone_cracks waterfront_backs"),
     ("Buildings, objects, terrain and areas", "place_building place_objects bulldoze terraform delete_areas"),
-    ("Districts", "build_district remove_district create_district delete_district rename_district set_district_policy"),
+    ("Districts", "build_district district_sites remove_district create_district delete_district rename_district set_district_policy"),
     ("City services and transit", "service_coverage service_budget service_sites park_sites attractiveness transit_report foot_traffic commute_flows station_sites sites_tiled service_access upgrade_all fix_access"),
     ("Previews and undo", "preview_commit preview_cancel undo"),
     ("Assets and prefabs", "asset_validate asset_import asset_configure prefab_clone prefab_components prefab_entity prefab_overrides mesh_materials mesh_export texture_export missing_assets menu_assets prefab_create brand_info brand_bind brand_bindings"),
@@ -24,7 +24,7 @@ def params(schema):
         t = v.get("type", "")
         if isinstance(t, list): t = "/".join(t)
         if t == "array" and isinstance(v.get("items"), dict) and v["items"].get("type"): t = v["items"]["type"] + "[]"
-        d = (v.get("description") or "").replace("|", "\|").replace("\n", " ")
+        d = (v.get("description") or "").replace("|", "\\|").replace("\n", " ")
         rows.append(f"| `{k}`{' *' if k in req else ''} | {t} | {d} |")
     return rows
 

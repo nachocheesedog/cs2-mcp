@@ -1750,8 +1750,13 @@ TOOLS = [
      "streets, only empty cells, arterial styles first so they take the corners) -> a game district with name / policies. "
      "The simulation is paused while it works (nothing grows into the way; the old speed comes back after), the camera "
      "stays put, and one compact report comes back: streets built / refused, buildings, zoning per style, dead ends "
-     "(fix_these = the ones a refused street left) and islands, money spent, history entries. Where: polygon [[x,z],...], or center + size (+ size_z, angle_deg), or "
-     "a box; default an 800 m square around the camera's ground point. Connectors may leave the outline by up to "
+     "(fix_these = the ones a refused street left) and islands, money spent, history entries. Where: site='auto' (the "
+     "default when no outline is given) finds free land next to the streets itself - straight on from a dead end or a "
+     "square T off a street with an empty side, closest to the camera (or `near` [x,z], `radius` m) first, checked with "
+     "a dry run (city limits, money) - and lays the grid out from that join; site=<a site from cs2_district_sites> builds "
+     "that one; or give polygon [[x,z],...], center + size (+ size_z, angle_deg), or a box. size = side of the land "
+     "looked at per site (default 600; 800 for center). An outline whose grid reaches no street is laid out again from "
+     "a dead end / empty street side that reaches into it. Connectors may leave the outline by up to "
      "connect_beyond_m (default 250) to join the streets around it; pieces that join nothing are dropped unless "
      "connected_only=false. preset = suburb | residential (default) | downtown "
      "| office | industrial picks road types, block length and zone families; local_type / arterial_type ('none' = no "
@@ -1764,6 +1769,8 @@ TOOLS = [
      "its zoning forecast + plan_id; cs2_build_district plan_id=... then builds exactly that draft. map=true adds one map of "
      "the result. Take it all back with cs2_remove_district.",
      {"type": "object", "properties": dict(AREA, polygon={"type": "array", "items": XZ}, angle_deg={"type": "number"},
+                                           site={"description": "'auto' (default without an outline) | a site object from cs2_district_sites"},
+                                           near=XZ, radius={"type": "number", "description": "site='auto': only look this far around near / the camera"},
                                            preset={"type": "string", "enum": sorted(tools16.PRESETS)},
                                            local_type={"type": "string"}, arterial_type={"type": "string", "description": "'none' = no arterials"},
                                            arterial_every={"type": "integer"}, block_length_cells={"type": "integer"},
@@ -1788,6 +1795,22 @@ TOOLS = [
                                            map={"type": "boolean"}, lattice={"type": "string", "enum": ["snap", "check", "off"]},
                                            chunk_m={"type": "number"}, px={"type": "integer"})},
      lambda a: tools16.build_district(rpc, a, _district_api())),
+    ("cs2_district_sites", "Where a new district can go (v0.46): free land next to the streets, reached the way a player "
+     "extends a town - straight on from a dead end, or a square T off a street whose side is still empty. Ranked sites, "
+     "each with its outline, the street it joins, how much of it is free (free_share, free_ha), whether it overlaps a "
+     "district, and check = a dry run of its first street (the game refuses unbought map tiles, or when money is short). "
+     "A map shows them numbered (free land green, lots brown, highways / tracks red). Pass one to cs2_build_district "
+     "(site=<the site object>), or let cs2_build_district site='auto' pick. near [x,z] (or 'camera') ranks closer sites "
+     "first; radius limits the search to around it (big cities); size = side of the land looked at per site (default "
+     "600); count (default 5); preset / local_type / arterial_type / block_length_cells as for cs2_build_district.",
+     {"type": "object", "properties": {"near": {"description": "[x, z] or 'camera'"}, "radius": {"type": "number"},
+                                       "size": {"type": "number"}, "count": {"type": "integer"},
+                                       "preset": {"type": "string", "enum": sorted(tools16.PRESETS)},
+                                       "local_type": {"type": "string"}, "arterial_type": {"type": "string"},
+                                       "arterial_every": {"type": "integer"}, "block_length_cells": {"type": "integer"},
+                                       "max_grade": {"type": "number"}, "check": {"type": "boolean", "description": "dry-run each site's first street (default true)"},
+                                       "map": {"type": "boolean"}, "px": {"type": "integer"}}},
+     lambda a: tools16.district_sites(rpc, a, _district_api())),
     ("cs2_remove_district", "Take back a district made by cs2_build_district (plan_id, default the newest one): an exact "
      "undo of its own history entries while they are still the newest ones of this city load; otherwise (or by_shape="
      "true) by shape - its streets (their zoning goes with them), its service buildings (by type and position) and its "
@@ -1826,7 +1849,7 @@ def send(msg):
 # hot reload: when any server/*.py changes, reload the helper modules + this file's tool table and tell the client the
 # tool list changed - new tools become callable in the running session, no new Claude Code session needed.
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_HELPERS = ("geom", "survey", "tools2", "tools3", "tools4", "tools5", "tools6", "tools7", "tools8", "tools9", "tools10", "tools11", "tools13", "tools14", "tools15", "tools16", "sites_tiled", "zoning", "assets")
+_HELPERS = ("geom", "survey", "sites", "tools2", "tools3", "tools4", "tools5", "tools6", "tools7", "tools8", "tools9", "tools10", "tools11", "tools13", "tools14", "tools15", "tools16", "sites_tiled", "zoning", "assets")
 
 
 def _mtimes():

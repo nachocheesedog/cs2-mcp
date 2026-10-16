@@ -7,6 +7,7 @@ and the assistant tends to spend them polishing details. These tools move the lo
 | Tool | What it does |
 |---|---|
 | `cs2_build_district` | outline → street grid → zero-crack flags → services → zoning → game district, in one call |
+| `cs2_district_sites` | where a new district can go: free land reached straight on from a dead end or past an empty street side |
 | `cs2_remove_district` | takes such a district back out (exact undo, or by shape) |
 | `cs2_batch` | runs a list of tool calls inside the server: one round trip for a known sequence |
 | `cs2_settings fast_mode` | builders skip the camera move, the post-build check and the dry-run forecast unless asked |
@@ -18,14 +19,20 @@ mod 0.36 or newer and batched zoning 0.35 or newer; with an older mod the build 
 
 ### What happens, in order
 
-1. **Outline.** `polygon`, a box, or `center` + `size` (+ `size_z`, `angle_deg`). The default is an 800 m square
-   around the camera's ground point.
+1. **Where.** With no outline, `site='auto'`: the tool finds free land next to the streets itself (see *Where a
+   district can go* below), nearest the camera (or `near`) first, and lays the grid out from the street it joins.
+   `site=<a site from cs2_district_sites>` builds that one. Or give the outline: `polygon`, a box, or `center` +
+   `size` (+ `size_z`, `angle_deg`; 800 m by default).
 2. **Street plan.** The same planner as `cs2_district_grid`: lined up with the parallel streets nearby (phase fitted so
-   the spacing to them is an exact pitch), spacing = road width + 96 m so every block gets full 6-cell zoning on both
-   sides, clipped to buildable land (no water, cliffs, highways, existing zoning or lots), junctions square.
-   Connectors may leave the outline by up to `connect_beyond_m` (default 250) to join the streets around it. Pieces
-   that join nothing are dropped unless `connected_only=false`. With no straight streets nearby to line up with, the
-   grid takes the angle of the outline's longest edge.
+   the spacing to them is an exact pitch) or, for a site, with the street it joins; spacing = road width + 96 m so
+   every block gets full 6-cell zoning on both sides, clipped to buildable land (no water, cliffs, highways, existing
+   zoning or lots), junctions square. Connectors may leave the outline by up to `connect_beyond_m` (default 250) to
+   join the streets around it; a grid line that runs straight into a dead end continues that street. Pieces that join
+   nothing are dropped unless `connected_only=false`. When an outline's grid reaches no street at all, the grid is laid
+   out again from a dead end or an empty street side that reaches into the outline. With no straight streets nearby
+   to line up with, the grid takes the angle of the outline's longest edge. When nothing can be built, `reason` says
+   why and `stats.diag` counts it: how much of the outline is free, how many street pieces fit, and why each join
+   failed (`buildings`, `highway_or_rail_in_the_way`, `no_street_in_reach`, …).
 3. **Pause.** The simulation is paused for the rest of the build, so nothing grows into the way of the next step.
    The old speed comes back at the end, also when something fails.
 4. **One preview of the whole plan.** If the game's preview reports a money error, the build stops there instead of
@@ -91,6 +98,34 @@ returns a map with the drafted streets and the zoning forecast, plus a `plan_id`
 builds exactly that draft. Arguments given at build time (name, services, zoning, policies...) override the ones the
 draft was made with. Without `preview` the first call builds straight away.
 
+### Where a district can go — `cs2_district_sites` and `site='auto'`
+
+The first live test (a real, lived-in city, 2026-10-16) drafted no grid anywhere: big squares drawn around the town
+left the grid to find a gap between the houses to join the streets through, and at the edge of a real town the streets
+are lined with buildings. A player extends a town differently — straight on from a dead end, or with a square T off a
+street whose far side is still empty — and that is what the sites are:
+
+1. One survey of the city (or of `near` ± `radius`): streets, building lots, terrain, water, districts. Free land =
+   outside every street's zoning reach, the lots, water, steep ground, and a margin around highways and tracks.
+   Highways, tracks and water split free land into stretches; a site counts only the stretch it can reach.
+2. Anchors: every dead end of a joinable street, and points every 32 m along straight streets (both sides, ≥ 40 m
+   from junctions).
+3. The way in: from the anchor straight out to the first cross street must be clear of buildings, highways, tracks,
+   water, other streets and steep grades — the same rules the planner applies to that connector.
+4. The first cross street sits so the old blocks and the new ones meet: 96 m kerb to kerb from the street a T joins,
+   or from the old street behind a dead end (but always clear of the dead end itself).
+5. The site: up to `size` × `size` (default 600 m) ahead of the anchor, trimmed where its sides or far end are mostly
+   not free; ranked by free area, dead ends a little ahead (they continue a street), nearer `near` first, a site that
+   overlaps a district at half weight (its district outline would be refused).
+6. A dry run of the first new street on each site: the game refuses unbought map tiles (city limits) and building
+   without money. Sites it refuses are listed after the others with the game's reasons.
+
+Each site carries its outline, its seed and its lattice (angle, origin on the anchor, phases), so
+`cs2_build_district site=...` drafts a grid joined to the city by construction. `found` counts every stage, so an
+empty list still says why (`spine_buildings`, `too_little_free_land`, `refused_by_game`, …). `server/test_sites.py`
+runs all of it against a lived-in fake town (houses along every street, a highway, a railway, a river, hills, city
+limits, and the same town turned 33°).
+
 ### Services
 
 `services = [{type, count?, min_gap_m?, lot_m?, allow_subnets?}]` or plain type names. Names come from
@@ -141,6 +176,8 @@ A call can still ask for any of them. Turn it off again for careful detail work.
 
 ## Prompts that use it
 
+- *"Build me a new residential district."* — `cs2_build_district` with no outline picks the site itself.
+- *"Where could a new industrial area go? Show me."* — `cs2_district_sites preset=industrial`.
 - *"Build a residential district in the empty land north of the river, between x 1200–2000 and z −300–400, with a
   clinic and a primary school. Call it Riverside."*
 - *"Preview a downtown district around the camera, 1.2 km wide. If the forecast is good, build it."*

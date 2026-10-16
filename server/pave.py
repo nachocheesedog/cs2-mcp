@@ -7,7 +7,7 @@ whole batch. remove_built() takes a built plan back out by shape (robust to edge
 Frame: u along angle_deg, v along angle_deg + 90. Lines of constant u are spaced pitch_u (set it to road width + 96 m
 for full 6-cell zoning on both sides); lines of constant v are spaced pitch_v (block length).
 """
-import math, time
+import collections, math, time
 import numpy as np
 from scipy import ndimage
 import contourpy
@@ -165,21 +165,32 @@ def plan_fill(rpc, area, *, angle_deg=58.5, origin=(0.0, 0.0), pitch_u=120.0, pi
         return (d_water[ij] >= need_water and d_road[ij] >= half + clear_road and d_major[ij] >= half + clear_major
                 and d_cell[ij] >= half + 1 and d_lot[ij] >= half + clear_lot)
 
-    def path_free(p, q, half, need_water, skip_end=0.0, cells_ok=False, zone=None):
-        """Every 4 m along p->q is buildable. The last skip_end metres may approach water/roads (a connector's target).
-        zone = the mask the path must stay in (default the region; connectors pass `conn_zone`)."""
+    def path_free(p, q, half, need_water, skip_end=0.0, cells_ok=False, zone=None, why=None, lot_relax=False):
+        """Every 4 m along p->q is buildable. The last skip_end metres may approach water/roads (a connector's target)
+        and, with lot_relax (a street continued straight on from a dead end), the lots along that street's last metres,
+        as long as the new road does not overlap them.
+        zone = the mask the path must stay in (default the region; connectors pass `conn_zone`).
+        why = a Counter that gets the first rule that failed (diagnostics)."""
         zone = region if zone is None else zone
         L = math.dist(p, q); n = max(2, int(L / 4))
+        def no(rule):
+            if why is not None: why[rule] += 1
+            return False
         for k in range(n + 1):
             f = k / n
             x, z = p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f
             ij = at(x, z)
-            if ij is None or not zone[ij] or not flat[ij] or water[ij]: return False
-            if d_lot[ij] < half + clear_lot or d_major[ij] < half + clear_major: return False
-            if f * L <= L - skip_end:
-                if d_water[ij] < need_water or d_road[ij] < half + clear_road: return False
-                if not cells_ok and d_cell[ij] < half + 1: return False
-        return grade_ok(p, q)
+            if ij is None or not zone[ij]: return no("outside")
+            if not flat[ij]: return no("steep")
+            if water[ij]: return no("water")
+            near_end = f * L > L - skip_end
+            if d_lot[ij] < (max(1.0, half - 1.0) if (lot_relax and near_end) else half + clear_lot): return no("buildings")
+            if d_major[ij] < half + clear_major: return no("highway_or_rail")
+            if not near_end:
+                if d_water[ij] < need_water: return no("water")
+                if d_road[ij] < half + clear_road: return no("road")
+                if not cells_ok and d_cell[ij] < half + 1: return no("zoning")
+        return grade_ok(p, q) or no("grade")
 
     # --- lattice
     a = math.radians(angle_deg); U = (math.cos(a), math.sin(a)); V = (-math.sin(a), math.cos(a))
@@ -196,17 +207,24 @@ def plan_fill(rpc, area, *, angle_deg=58.5, origin=(0.0, 0.0), pitch_u=120.0, pi
     grid_need = (shore_setback + widths[shore_type or local_type] / 2 + 2 * 6 * CELL + widths[local_type] / 2) if rim \
         else widths[local_type] / 2 + 12.0
     kept = {}                            # ((k,j),(k2,j2)) -> segment dict
+    piece_fail, conn_out = collections.Counter(), collections.Counter()      # diagnostics: why pieces / joins failed
+    tried = 0
+    def inside_poly(p):
+        ij = at(*p); return ij is not None and bool(region[ij])
     for k in (ks if grid else ()):                         # lines of constant u, pieces j..j+1
         for j in js:
             if j + 1 not in vs: continue
             p, q = world(us[k], vs[j]), world(us[k], vs[j + 1])
-            if path_free(p, q, widths[local_type] / 2, grid_need): kept[((k, j), (k, j + 1))] = {"start": p, "end": q, "type": local_type}
+            if inside_poly(p) or inside_poly(q): tried += 1
+            if path_free(p, q, widths[local_type] / 2, grid_need, why=piece_fail): kept[((k, j), (k, j + 1))] = {"start": p, "end": q, "type": local_type}
     for j in (js if grid else ()):       # lines of constant v, pieces k..k+1
         typ = arterial_type if art(j) else local_type
         for k in ks:
             if k + 1 not in us: continue
             p, q = world(us[k], vs[j]), world(us[k + 1], vs[j])
-            if path_free(p, q, widths[typ] / 2, grid_need): kept[((k, j), (k + 1, j))] = {"start": p, "end": q, "type": typ}
+            if inside_poly(p) or inside_poly(q): tried += 1
+            if path_free(p, q, widths[typ] / 2, grid_need, why=piece_fail): kept[((k, j), (k + 1, j))] = {"start": p, "end": q, "type": typ}
+    piece_fail.pop("outside", None)      # pieces off the outline are not news
     deg = {}
     for (n1, n2) in kept: deg[n1] = deg.get(n1, 0) + 1; deg[n2] = deg.get(n2, 0) + 1
 
@@ -260,6 +278,15 @@ def plan_fill(rpc, area, *, angle_deg=58.5, origin=(0.0, 0.0), pitch_u=120.0, pi
     A_e = np.concatenate(A_e) if A_e else np.zeros((0, 2)); B_e = np.concatenate(B_e) if B_e else np.zeros((0, 2))
     node_pos = np.array([n["pos"][::2] for n in w.nodes.values()]) if w.nodes else np.zeros((0, 2))
     node_ids = list(w.nodes.keys())
+    # v0.46: dead ends of joinable streets - a lattice line running straight into one continues that street (a ray
+    # along the street itself never "hits" it, so these are matched by position)
+    arm_of = collections.defaultdict(list)
+    for e, is_major in obstacles:
+        for key in ("start_node", "end_node"): arm_of[e[key]].append((e, is_major))
+    dead = [(nid, n, arm_of[nid][0][0]) for nid, n in w.nodes.items()
+            if n.get("degree") == 1 and not n.get("outside_connection") and not n.get("owned_arms")
+            and len(arm_of.get(nid, ())) == 1 and not arm_of[nid][0][1]]
+    dead_pos = np.array([n["pos"][::2] for _, n, _ in dead]) if dead else np.zeros((0, 2))
 
     def curve_free(pts, half, skip_end):
         L = sum(math.dist(a, b) for a, b in zip(pts, pts[1:])); acc = 0.0
@@ -303,6 +330,23 @@ def plan_fill(rpc, area, *, angle_deg=58.5, origin=(0.0, 0.0), pitch_u=120.0, pi
         reach = (pitch_u if const_v else pitch_v) * connect_reach
         ts, si_ = _seg_hits(p, d, reach, A_s, B_s)
         te, ei_ = _seg_hits(p, d, reach, A_e, B_e)
+        if len(dead_pos):                        # straight on into a dead end: continue that street
+            rel = dead_pos - p; t_ = rel @ d; perp = np.abs(rel[:, 0] * d[1] - rel[:, 1] * d[0])
+            m = (t_ > 0.5) & (t_ <= reach) & (perp < 2.5)
+            if m.any():
+                i = int(np.where(m)[0][np.argmin(t_[m])]); tn = float(t_[i])
+                own = te is not None and owner_e[ei_][0] is dead[i][2]      # a near-parallel "hit" on that street itself
+                if (ts is None or tn < ts) and (te is None or tn <= te + 1.0 or own):
+                    nid, nd, e = dead[i]; hit = dead_pos[i]
+                    skip = e["width"] / 2 + widths[typ] / 2 + clear_road + 4
+                    if path_free(tuple(p), tuple(hit), widths[typ] / 2, 0, skip_end=skip, cells_ok=True, zone=conn_zone,
+                                 why=conn_out, lot_relax=True):
+                        conn_out["joined_dead_end"] += 1
+                        connectors.append({"start": tuple(p), "end": tuple(map(float, hit)), "type": typ, "to": ("existing", e["id"]),
+                                           "from": n, "dead_end": nid})
+                        continue
+        if ts is None and te is None:
+            conn_out["no_street_in_reach"] += 1
         if ts is not None and (te is None or ts < te):
             hit = p + d * ts; ri, pi = owner_s[si_]
             ang = _angle_between(d, B_s[si_] - A_s[si_]); seg = None
@@ -318,21 +362,23 @@ def plan_fill(rpc, area, *, angle_deg=58.5, origin=(0.0, 0.0), pitch_u=120.0, pi
             connectors.append(c)
         elif te is not None:
             e, is_major = owner_e[ei_]
-            if is_major: continue
+            if is_major: conn_out["highway_or_rail_in_the_way"] += 1; continue
             hit = p + d * te
             ang = _angle_between(d, B_e[ei_] - A_e[ei_]); seg = None
             skip = e["width"] / 2 + widths[typ] / 2 + clear_road + 48
             if ang < perp_deg:                   # skewed onto an existing street: bend to arrive square
                 b = bend(p, d, hit, B_e[ei_] - A_e[ei_], A_e, B_e, owner_e, lambda o, e=e: o[0] is e, widths[typ] / 2, skip)
                 if b: hit = np.array(b["end"]); seg = b
-                elif survey.is_straight(e["curve"]) or ang < min_angle_curved: continue
-            if seg is None and not path_free(tuple(p), tuple(hit), widths[typ] / 2, 0, skip_end=skip, cells_ok=True, zone=conn_zone): continue
+                elif survey.is_straight(e["curve"]) or ang < min_angle_curved: conn_out["skewed"] += 1; continue
+            if seg is None and not path_free(tuple(p), tuple(hit), widths[typ] / 2, 0, skip_end=skip, cells_ok=True, zone=conn_zone,
+                                             why=conn_out): continue
             if len(node_pos):
                 dn = np.hypot(*(node_pos - hit).T); i = int(np.argmin(dn))
                 if dn[i] < 3: hit = node_pos[i]
-                elif dn[i] < junction_gap_m: continue
+                elif dn[i] < junction_gap_m: conn_out["too_close_to_a_junction"] += 1; continue
             c = {"start": tuple(p), "end": tuple(map(float, hit)), "type": typ, "to": ("existing", e["id"]), "from": n}
             if seg: c["controls"] = seg["controls"]; c["bent"] = True
+            conn_out["joined"] += 1
             connectors.append(c)
 
     # --- shore segments: cubic pieces between junctions (connector hits) and regular breaks every ~80 m
@@ -375,13 +421,21 @@ def plan_fill(rpc, area, *, angle_deg=58.5, origin=(0.0, 0.0), pitch_u=120.0, pi
         return o
     segs = [out(s_, "grid") for s_ in grid_segs] + [out(s_, "grid") for s_ in conn_segs] + [out(s_, "shore") for s_ in shore_segs]
     length = lambda s_: math.dist(s_["start"], s_["end"])
+    # v0.46 diagnostics: how much of the outline a street could use, how many lattice pieces fit, why joins failed
+    half_l = widths[local_type] / 2
+    open_ = region & flat & ~water & (d_road >= half_l + clear_road) & (d_cell >= half_l + 1) & (d_lot >= half_l + clear_lot) \
+        & (d_major >= half_l + clear_major)
+    diag = {"free_share": round(float(open_.sum()) / max(1, int(region.sum())), 2), "outline_px": int(region.sum()),
+            "pieces_tried": tried, "pieces_fit": len(kept), "piece_fails": dict(piece_fail.most_common(5)),
+            "frontier_ends": len(ends), "joins": dict(conn_out.most_common(8)), "dead_ends_nearby": len(dead)}
     return {"segments": segs, "seed": [sx, sz],
             "stats": {"grid_segments": len(grid_segs), "connectors": len(conn_segs),
                       "to_existing": sum(1 for c in conn_segs if c["to"][0] == "existing"),
+                      "to_dead_ends": sum(1 for c in conn_segs if c.get("dead_end")),
                       "bent_to_square": sum(1 for c in conn_segs if c.get("bent")),
                       "shore_segments": len(shore_segs), "shore_runs": len({s_["run"] for s_ in shore_segs}),
                       "dropped_unconnected": dropped, "road_km": round(sum(length(s_) for s_ in segs) / 1000, 1),
-                      "plan_s": round(time.time() - t0, 1)}}
+                      "plan_s": round(time.time() - t0, 1), "diag": diag}}
 
 
 def connect_options(rpc, area, max_m=250.0, min_gap=35.0, min_angle=35.0, max_grade=0.18):

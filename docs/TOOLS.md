@@ -1,6 +1,6 @@
 # Tool reference
 
-All 127 tools the `cs2` MCP server exposes, generated from the server's registry by `tools/gen_tools_doc.py`. `*` = required parameter.
+All 128 tools the `cs2` MCP server exposes, generated from the server's registry by `tools/gen_tools_doc.py`. `*` = required parameter.
 
 Conventions: world coordinates are the game's (x/z horizontal in metres, y up); zoning cells are 8 m. Every editing tool accepts `dry_run` (preview + error reasons, nothing built) and most accept `hold` (keep the preview until `cs2_preview_commit` / `cs2_preview_cancel`). Edits return an `undo_id` for `cs2_undo`.
 
@@ -123,7 +123,7 @@ Call a bridge method directly (debugging): ping, city_info, camera, camera_goto,
 
 ### `cs2_screenshot`
 
-Take a screenshot of the game and return the image. Optionally move the camera first (x, z, zoom, yaw, pitch) and wait settle_s seconds (default 2) for it to arrive. max_width scales the returned JPG (default 1280, max 3840). Mod 0.30: clean=true = a proper game shot like Photo Mode's 'Take photo' - no UI, no notification icons, overlays, road names or route lines (restored afterwards); frames = frames to wait before capturing (default 30, lets TAA settle); save_png = path to keep the full-resolution PNG (mod 0.33: a .png under %USERPROFILE%lender, %USERPROFILE%\cs2-mcp, the game's Screenshots folder or %TEMP%; more roots in ModsData\CS2MCP\save_png_roots.txt); supersize = 1..4x render scale. Combine with cs2_photo_mode for grading.
+Take a screenshot of the game and return the image. Optionally move the camera first (x, z, zoom, yaw, pitch) and wait settle_s seconds (default 2) for it to arrive. max_width scales the returned JPG (default 1280, max 3840). Mod 0.30: clean=true = a proper game shot like Photo Mode's 'Take photo' - no UI, no notification icons, overlays, road names or route lines (restored afterwards); frames = frames to wait before capturing (default 30, lets TAA settle); save_png = path to keep the full-resolution PNG (mod 0.33: a .png under %USERPROFILE%\blender, %USERPROFILE%\cs2-mcp, the game's Screenshots folder or %TEMP%; more roots in ModsData\CS2MCP\save_png_roots.txt); supersize = 1..4x render scale. Combine with cs2_photo_mode for grading.
 
 | Parameter | Type | Description |
 |---|---|---|
@@ -1532,7 +1532,7 @@ Delete areas (e.g. broken surfaces from a removed mod) by id from cs2_areas.
 
 ### `cs2_build_district`
 
-A whole new district in ONE call (v0.46) - use it instead of laying streets, zoning and placing services step by step. Outline -> zoning-perfect street grid (cs2_district_grid's planner: lined up with the streets around it, joined to them, clipped to buildable land, snapped onto the zone lattice) -> zero-crack flags -> optional service buildings spread along the new streets -> zoning of the new frontage by role (arterials vs local streets, only empty cells, arterial styles first so they take the corners) -> a game district with name / policies. The simulation is paused while it works (nothing grows into the way; the old speed comes back after), the camera stays put, and one compact report comes back: streets built / refused, buildings, zoning per style, dead ends (fix_these = the ones a refused street left) and islands, money spent, history entries. Where: polygon [[x,z],...], or center + size (+ size_z, angle_deg), or a box; default an 800 m square around the camera's ground point. Connectors may leave the outline by up to connect_beyond_m (default 250) to join the streets around it; pieces that join nothing are dropped unless connected_only=false. preset = suburb | residential (default) | downtown | office | industrial picks road types, block length and zone families; local_type / arterial_type ('none' = no arterials) / arterial_every / block_length_cells / zoning_depth_cells / angle_deg override it. zoning = false (roads only) | a zone type name or family ('residential low' / 'residential medium' / 'residential row' / 'residential high' / 'mixed' / 'commercial low' / 'commercial high' / 'office' / 'industrial') | a list (rotated street by street) | {arterial, local}; families resolve to this game's zone types, preferring theme ('NA', 'EU'...; default: the style zoned most nearby). services = [{type, count?, min_gap_m?, allow_subnets?}] (names from cs2_list_building_types; buildings with built-in nets need allow_subnets=true and a save). preview=true drafts only: a map with the plan and its zoning forecast + plan_id; cs2_build_district plan_id=... then builds exactly that draft. map=true adds one map of the result. Take it all back with cs2_remove_district.
+A whole new district in ONE call (v0.46) - use it instead of laying streets, zoning and placing services step by step. Outline -> zoning-perfect street grid (cs2_district_grid's planner: lined up with the streets around it, joined to them, clipped to buildable land, snapped onto the zone lattice) -> zero-crack flags -> optional service buildings spread along the new streets -> zoning of the new frontage by role (arterials vs local streets, only empty cells, arterial styles first so they take the corners) -> a game district with name / policies. The simulation is paused while it works (nothing grows into the way; the old speed comes back after), the camera stays put, and one compact report comes back: streets built / refused, buildings, zoning per style, dead ends (fix_these = the ones a refused street left) and islands, money spent, history entries. Where: site='auto' (the default when no outline is given) finds free land next to the streets itself - straight on from a dead end or a square T off a street with an empty side, closest to the camera (or `near` [x,z], `radius` m) first, checked with a dry run (city limits, money) - and lays the grid out from that join; site=<a site from cs2_district_sites> builds that one; or give polygon [[x,z],...], center + size (+ size_z, angle_deg), or a box. size = side of the land looked at per site (default 600; 800 for center). An outline whose grid reaches no street is laid out again from a dead end / empty street side that reaches into it. Connectors may leave the outline by up to connect_beyond_m (default 250) to join the streets around it; pieces that join nothing are dropped unless connected_only=false. preset = suburb | residential (default) | downtown | office | industrial picks road types, block length and zone families; local_type / arterial_type ('none' = no arterials) / arterial_every / block_length_cells / zoning_depth_cells / angle_deg override it. zoning = false (roads only) | a zone type name or family ('residential low' / 'residential medium' / 'residential row' / 'residential high' / 'mixed' / 'commercial low' / 'commercial high' / 'office' / 'industrial') | a list (rotated street by street) | {arterial, local}; families resolve to this game's zone types, preferring theme ('NA', 'EU'...; default: the style zoned most nearby). services = [{type, count?, min_gap_m?, allow_subnets?}] (names from cs2_list_building_types; buildings with built-in nets need allow_subnets=true and a save). preview=true drafts only: a map with the plan and its zoning forecast + plan_id; cs2_build_district plan_id=... then builds exactly that draft. map=true adds one map of the result. Take it all back with cs2_remove_district.
 
 | Parameter | Type | Description |
 |---|---|---|
@@ -1545,6 +1545,9 @@ A whole new district in ONE call (v0.46) - use it instead of laying streets, zon
 | `size_z` | number |  |
 | `polygon` | array[] |  |
 | `angle_deg` | number |  |
+| `site` |  | 'auto' (default without an outline) \| a site object from cs2_district_sites |
+| `near` | number[] |  |
+| `radius` | number | site='auto': only look this far around near / the camera |
 | `preset` | string |  |
 | `local_type` | string |  |
 | `arterial_type` | string | 'none' = no arterials |
@@ -1574,6 +1577,26 @@ A whole new district in ONE call (v0.46) - use it instead of laying streets, zon
 | `map` | boolean |  |
 | `lattice` | string |  |
 | `chunk_m` | number |  |
+| `px` | integer |  |
+
+### `cs2_district_sites`
+
+Where a new district can go (v0.46): free land next to the streets, reached the way a player extends a town - straight on from a dead end, or a square T off a street whose side is still empty. Ranked sites, each with its outline, the street it joins, how much of it is free (free_share, free_ha), whether it overlaps a district, and check = a dry run of its first street (the game refuses unbought map tiles, or when money is short). A map shows them numbered (free land green, lots brown, highways / tracks red). Pass one to cs2_build_district (site=<the site object>), or let cs2_build_district site='auto' pick. near [x,z] (or 'camera') ranks closer sites first; radius limits the search to around it (big cities); size = side of the land looked at per site (default 600); count (default 5); preset / local_type / arterial_type / block_length_cells as for cs2_build_district.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `near` |  | [x, z] or 'camera' |
+| `radius` | number |  |
+| `size` | number |  |
+| `count` | integer |  |
+| `preset` | string |  |
+| `local_type` | string |  |
+| `arterial_type` | string |  |
+| `arterial_every` | integer |  |
+| `block_length_cells` | integer |  |
+| `max_grade` | number |  |
+| `check` | boolean | dry-run each site's first street (default true) |
+| `map` | boolean |  |
 | `px` | integer |  |
 
 ### `cs2_remove_district`

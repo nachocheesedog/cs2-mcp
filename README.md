@@ -14,7 +14,7 @@ MCP client (Claude Code, …)
         │  stdio (MCP)
         ▼
 server/cs2_mcp.py ──── HTTP, 127.0.0.1:17654 only ────▶ CS2MCP mod (inside the game)
- 127 tools: planning, geometry,                          runs each command on the game's main
+ 128 tools: planning, geometry,                          runs each command on the game's main
  maps, checks                                            thread; edits go through a custom tool
                                                          (preview → error check → apply → undo)
 ```
@@ -47,7 +47,7 @@ server/cs2_mcp.py ──── HTTP, 127.0.0.1:17654 only ────▶ CS2MCP
 | **Zoning** | cell-exact zoning and rezoning, rule-based zoning palettes, batched zoning in one undo step, a zoning forecast (lost depth, dead gaps), zone-crack detection and a road half-alignment fix |
 | **City health** | demand with its factors, building warnings per district, service coverage (health, fire, police, parks, education, deathcare…), budgets, transit ridership, foot traffic, commute flows, site finders for parks, services and stations |
 | **Buildings and objects** | place any building with an exact lot centre and facing, install service upgrades, place trees and props along a shoreline or road or scattered in an area, terraform |
-| **Districts** | a whole new district in one call (`cs2_build_district`: street grid, zero-crack flags, service buildings, zoning by street role, district and policies, with the simulation paused) and back out in one (`cs2_remove_district`); create, rename and delete districts, set their policies |
+| **Districts** | a whole new district in one call (`cs2_build_district`: it finds free land next to the streets itself — `cs2_district_sites` lists the options — then street grid, zero-crack flags, service buildings, zoning by street role, district and policies, with the simulation paused) and back out in one (`cs2_remove_district`); create, rename and delete districts, set their policies |
 | **Speed** | `cs2_batch` runs many tool calls in one; `cs2_settings fast_mode` skips camera moves and post-build checks during long building sessions |
 | **Assets** | validate a Blender export, import it into the running game, configure it (copy settings from a vanilla building, lot size, households, icon, name, description), clone prefabs, export game meshes and textures back to Blender |
 | **Session** | list and load saves, return to the main menu, restart the game, change the simulation speed |
