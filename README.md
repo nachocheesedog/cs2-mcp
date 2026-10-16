@@ -14,7 +14,7 @@ MCP client (Claude Code, …)
         │  stdio (MCP)
         ▼
 server/cs2_mcp.py ──── HTTP, 127.0.0.1:17654 only ────▶ CS2MCP mod (inside the game)
- 124 tools: planning, geometry,                          runs each command on the game's main
+ 127 tools: planning, geometry,                          runs each command on the game's main
  maps, checks                                            thread; edits go through a custom tool
                                                          (preview → error check → apply → undo)
 ```
@@ -47,7 +47,8 @@ server/cs2_mcp.py ──── HTTP, 127.0.0.1:17654 only ────▶ CS2MCP
 | **Zoning** | cell-exact zoning and rezoning, rule-based zoning palettes, batched zoning in one undo step, a zoning forecast (lost depth, dead gaps), zone-crack detection and a road half-alignment fix |
 | **City health** | demand with its factors, building warnings per district, service coverage (health, fire, police, parks, education, deathcare…), budgets, transit ridership, foot traffic, commute flows, site finders for parks, services and stations |
 | **Buildings and objects** | place any building with an exact lot centre and facing, install service upgrades, place trees and props along a shoreline or road or scattered in an area, terraform |
-| **Districts** | create, rename and delete districts, set their policies |
+| **Districts** | a whole new district in one call (`cs2_build_district`: street grid, zero-crack flags, service buildings, zoning by street role, district and policies, with the simulation paused) and back out in one (`cs2_remove_district`); create, rename and delete districts, set their policies |
+| **Speed** | `cs2_batch` runs many tool calls in one; `cs2_settings fast_mode` skips camera moves and post-build checks during long building sessions |
 | **Assets** | validate a Blender export, import it into the running game, configure it (copy settings from a vanilla building, lot size, households, icon, name, description), clone prefabs, export game meshes and textures back to Blender |
 | **Session** | list and load saves, return to the main menu, restart the game, change the simulation speed |
 
@@ -118,6 +119,8 @@ Try these prompts once a city is loaded:
 - *"Check this district for dead ends, near-miss junctions and unused land."*
 - *"Dry-run a 4 × 3 grid of small roads here with 96 m zoning depth between streets, and show me the preview."*
 - *"Which districts are short on healthcare coverage? Suggest sites for a clinic."*
+- *"Build a residential district on the empty land north of here, about 1 km across, with a clinic and a primary
+  school. Call it Riverside."* — one `cs2_build_district` call; see [docs/DISTRICT_BUILDER.md](docs/DISTRICT_BUILDER.md).
 
 Good habits:
 
@@ -163,6 +166,7 @@ still the best protection.
 | [docs/TOOLS.md](docs/TOOLS.md) | every tool and its parameters (generated from the server) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | how the mod and server fit together, the bridge protocol, adding a tool |
 | [docs/ROAD_LAYOUT.md](docs/ROAD_LAYOUT.md) | how the game zones along roads, and layout rules that avoid gaps and cracks |
+| [docs/DISTRICT_BUILDER.md](docs/DISTRICT_BUILDER.md) | one-call districts, presets and zoning families, removal, batches, fast mode |
 | [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md) | Blender → game import without the Editor, and the importer pitfalls |
 | [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) | crash paths found so far, limitations, untested areas |
 | [CHANGELOG.md](CHANGELOG.md) | version history |
@@ -223,7 +227,8 @@ mod/        C# code mod (net472). Bridge.cs = HTTP listener + version; McpBridge
             thread; McpToolSystem.cs = the editing tool; Operations.cs = place / bulldoze / zone / undo; one file per
             feature area after that.
 server/     MCP server (stdio). cs2_mcp.py = protocol, tool registry, hot reload; tools*.py, pave.py, zoning.py,
-            align.py, survey.py = planners, geometry, map renderer; assets.py = asset validation/import.
+            align.py, survey.py = planners, geometry, map renderer; tools16.py = one-call districts, batches;
+            assets.py = asset validation/import.
 tools/      import_mesh_export.py (game mesh -> Blender), gen_tools_doc.py (regenerates docs/TOOLS.md).
 docs/       reference docs.
 ```
@@ -232,7 +237,7 @@ The offline tests use a synthetic town, so they need no game:
 
 ```bash
 cd server
-python test_grid.py && python test_v02.py && python test_survey.py && python test_district.py
+python test_grid.py && python test_v02.py && python test_survey.py && python test_district.py && python test_build_district.py
 ```
 
 After you add or change a tool, regenerate the reference with `python tools/gen_tools_doc.py`.

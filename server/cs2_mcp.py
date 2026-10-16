@@ -6,7 +6,7 @@ Tools: status, camera, terrain heights, road types, road query, road placement a
 World coordinates are CS2's: x/z horizontal in metres, y up. Zoning cells are 8 m.
 """
 import base64, json, math, os, sys, time, urllib.request, urllib.error
-import survey, tools2, tools3, tools4, tools5, tools6, tools7, tools8, tools9, tools10, tools11, tools13, tools14, tools15, assets
+import survey, tools2, tools3, tools4, tools5, tools6, tools7, tools8, tools9, tools10, tools11, tools13, tools14, tools15, tools16, assets
 
 BRIDGE = "http://127.0.0.1:17654"
 PROTOCOL = "2024-11-05"
@@ -286,7 +286,7 @@ def t_place_roads(a):
     if res.get("error_locations") and not a.get("verbose"): res["error_locations"] = res["error_locations"][:30]
     out = dict(compact(res, a), **extra)
     if res.get("applied"): tools2.after_build(rpc, a, segs, out)
-    if a.get("dry_run") and a.get("zoning_check", True) and segs:
+    if a.get("dry_run") and a.get("zoning_check", not tools2.fast()) and segs:
         try: out["zoning_forecast"] = _forecast_for(segs)
         except Exception as ex: out["zoning_forecast"] = {"error": str(ex)}
     return out
@@ -429,7 +429,7 @@ def _outline_area(a):
     poly = a.get("polygon")
     if poly:
         xs, zs = [p[0] for p in poly], [p[1] for p in poly]
-        pad = 60.0
+        pad = 60.0 + float(a.get("connect_beyond_m") or 0)       # room for connectors that leave the outline (v0.46)
         return survey.Area(min(xs) - pad, min(zs) - pad, max(xs) + pad, max(zs) + pad), poly
     return survey.area_from(a, camera_ground), None
 
@@ -528,6 +528,12 @@ def t_zoning_check(a):
 
 
 def t_district_grid(a):
+    plan, area, extra = _grid_plan(a)
+    return _preview_or_build(plan, a, area, "grid", extra)
+
+
+def _grid_plan(a):
+    """The street plan cs2_district_grid drafts (also used by cs2_build_district): (plan, area, extra)."""
     import pave
     area, poly = _outline_area(a)
     seed = _seed(a, area, poly)
@@ -554,8 +560,8 @@ def t_district_grid(a):
                           v_phase=lat.get("v_phase", 0), pitch_u=pitch_u, pitch_v=pitch_v, local_type=local,
                           arterial_type=a.get("arterial_type"), arterial_every=a.get("arterial_every", 4),
                           max_grade=a.get("max_grade", 0.15), seed=tuple(seed), polygon=poly, rim=False,
-                          keep_islands=not a.get("connected_only", True))
-    return _preview_or_build(plan, a, area, "grid", {"lattice": lat, "pitch_m": [pitch_u, pitch_v]})
+                          keep_islands=not a.get("connected_only", True), connect_beyond=float(a.get("connect_beyond_m") or 0))
+    return plan, area, {"lattice": lat, "pitch_m": [pitch_u, pitch_v]}
 
 
 def t_rim_road(a):
@@ -586,7 +592,7 @@ def _build_plan(plan_id, plan, a):
     chunks = pave.chunks(plan, tile=a.get("chunk_m", 1000.0))
     built = refused = edges = 0; bad_all = []
     for phase, segs in chunks:
-        if a.get("follow_camera", tools2.settings().get("follow_camera", True)):
+        if a.get("follow_camera", tools2.settings().get("follow_camera", True) and not tools2.fast()):
             rpc("camera_goto", {"x": sum(s["start"][0] for s in segs) / len(segs), "z": sum(s["start"][1] for s in segs) / len(segs)})
         res, bad = pave.place_skip_failing(rpc, [pave.clean(s) for s in segs])
         built += len(segs) - len(bad); refused += len(bad); bad_all += bad
@@ -614,6 +620,14 @@ def _load_plan(plan_id):
 
 
 def t_build_plan(a): return dict(plan_id=a["plan_id"], **_build_plan(a["plan_id"], _load_plan(a["plan_id"]), a))
+
+
+def _district_api():
+    """What tools16 (cs2_build_district, cs2_remove_district, cs2_batch) uses from this module - looked up at call time,
+    so hot reload keeps working."""
+    return {"grid_plan": _grid_plan, "lattice": _lattice, "build_plan": _build_plan, "widths": road_widths, "plan_dir": PLAN_DIR,
+            "image_result": image_result, "forecast_brief": _forecast_brief, "forecast_marks": _forecast_marks,
+            "rect_corners": rect_corners, "camera_ground": camera_ground, "handlers": HANDLERS, "tools": TOOLS}
 
 
 def t_remove_plan(a):
@@ -741,7 +755,7 @@ def t_shore(a):
 def _settings(a):
     cur = tools2.settings()
     if a:
-        cur.update({k: v for k, v in a.items() if k in ("follow_camera",)})
+        cur.update({k: v for k, v in a.items() if k in ("follow_camera", "fast_mode")})
         with open(tools2.SETTINGS, "w", encoding="utf-8") as fh: json.dump(cur, fh, indent=1)
     return cur
 
@@ -750,7 +764,7 @@ def _builder(fn):
     def run(a):
         segs, info = fn(a, tools2.framed(a))
         res = tools2.place_built(rpc, a, segs, info, compact)
-        if (a.get("dry_run") or a.get("plan_only")) and segs and isinstance(res, dict) and a.get("zoning_check", True):
+        if (a.get("dry_run") or a.get("plan_only")) and segs and isinstance(res, dict) and a.get("zoning_check", not tools2.fast()):
             try: res["zoning_forecast"] = _forecast_for(segs)       # v0.27: every road builder's preview says how it will zone
             except Exception as ex: res["zoning_forecast"] = {"error": str(ex)}
         return res
@@ -894,7 +908,8 @@ TOOLS = [
      "bends so its last ~50 m arrive square (dropped if that does not fit; down to 60 deg allowed onto curved roads); "
      "with a given angle_deg the line positions are fitted to parallel streets nearby so the spacing to them is an exact "
      "pitch (no overlap, no dead gap). The preview carries a zoning_forecast (draft full-depth share, dead gaps, skewed "
-     "junctions, verdict) and marks G / S / D on the map - redraft until the verdict is good.",
+     "junctions, verdict) and marks G / S / D on the map - redraft until the verdict is good. For a whole new district "
+     "(streets + zoning + services + district) in one call, use cs2_build_district.",
      {"type": "object", "properties": {
          "polygon": {"type": "array", "items": XZ}, "xmin": {"type": "number"}, "zmin": {"type": "number"}, "xmax": {"type": "number"},
          "zmax": {"type": "number"}, "center": XZ, "size": {"type": "number"}, "seed": XZ,
@@ -902,7 +917,8 @@ TOOLS = [
          "angle_deg": {"type": "number"}, "origin": XZ, "u_phase": {"type": "number"}, "v_phase": {"type": "number"},
          "match_radius": {"type": "number"}, "block_length_cells": {"type": "integer"}, "zoning_depth_cells": {"type": "integer"},
          "pitch_u": {"type": "number"}, "pitch_v": {"type": "number"}, "max_grade": {"type": "number"},
-         "connected_only": {"type": "boolean"}, "build": {"type": "boolean"}, "px": {"type": "integer"}}}, t_district_grid),
+         "connected_only": {"type": "boolean"}, "build": {"type": "boolean"}, "px": {"type": "integer"},
+         "connect_beyond_m": {"type": "number", "description": "v0.46: connectors (not the grid) may leave the outline by this much to reach a street (default 0)"}}}, t_district_grid),
     ("cs2_zoning_check", "Zoning forecast (v0.27) for an area's roads, optionally with a draft laid over them (plan_id from "
      "cs2_district_grid / cs2_rim_road, or segments in place_roads shape) - BEFORE building. The game zones 6 cells (48 m) "
      "deep on both sides of a road in 8 m columns: reports each column's usable depth, full_depth_share for straight "
@@ -1414,8 +1430,10 @@ TOOLS = [
                                                                "description": "with describe: only these components (e.g. [\"ObjectSubNets\"])"}},
       "required": ["name"]}, assets.configure),
     ("cs2_settings", "Persistent server settings (settings.json): follow_camera (default true) = builders move the game camera "
-     "to each change. Call with no arguments to read, or give values to change them.",
-     {"type": "object", "properties": {"follow_camera": {"type": "boolean"}}}, lambda a: _settings(a)),
+     "to each change. fast_mode (v0.46, default false) = for quick building sessions: builders skip the camera move, the "
+     "post-build junction check and the zoning forecast on dry runs unless a call asks for them (follow_camera / check / "
+     "zoning_check = true). Call with no arguments to read, or give values to change them.",
+     {"type": "object", "properties": {"follow_camera": {"type": "boolean"}, "fast_mode": {"type": "boolean"}}}, lambda a: _settings(a)),
     ("cs2_zone_report", "Zoning mix per district (or polygon / box): families with % built, the top zone styles as "
      "[cells, empty cells], empty zoned cells and unzoned cells. One call instead of zone_summary per district.",
      {"type": "object", "properties": dict({"districts": {"type": "array", "items": {"type": "string"}, "description": "district names (default: all)"}, "polygon": {"type": "array", "items": XZ}, "xmin": {"type": "number"}, "zmin": {"type": "number"}, "xmax": {"type": "number"}, "zmax": {"type": "number"}}, styles_top={"type": "integer"})}, lambda a: tools5.zone_report(rpc, a)),
@@ -1725,6 +1743,70 @@ TOOLS = [
                                        "design_speed_kmh": {"type": "number"}, "plan_only": {"type": "boolean"}, "build": {"type": "boolean"}},
       "required": ["trunk", "branches", "split"]},
      lambda a: tools14.highway_fork(rpc, a)),
+    ("cs2_build_district", "A whole new district in ONE call (v0.46) - use it instead of laying streets, zoning and "
+     "placing services step by step. Outline -> zoning-perfect street grid (cs2_district_grid's planner: lined up with the "
+     "streets around it, joined to them, clipped to buildable land, snapped onto the zone lattice) -> zero-crack flags -> "
+     "optional service buildings spread along the new streets -> zoning of the new frontage by role (arterials vs local "
+     "streets, only empty cells, arterial styles first so they take the corners) -> a game district with name / policies. "
+     "The simulation is paused while it works (nothing grows into the way; the old speed comes back after), the camera "
+     "stays put, and one compact report comes back: streets built / refused, buildings, zoning per style, dead ends "
+     "(fix_these = the ones a refused street left) and islands, money spent, history entries. Where: polygon [[x,z],...], or center + size (+ size_z, angle_deg), or "
+     "a box; default an 800 m square around the camera's ground point. Connectors may leave the outline by up to "
+     "connect_beyond_m (default 250) to join the streets around it; pieces that join nothing are dropped unless "
+     "connected_only=false. preset = suburb | residential (default) | downtown "
+     "| office | industrial picks road types, block length and zone families; local_type / arterial_type ('none' = no "
+     "arterials) / arterial_every / block_length_cells / zoning_depth_cells / angle_deg override it. zoning = false (roads "
+     "only) | a zone type name or family ('residential low' / 'residential medium' / 'residential row' / 'residential "
+     "high' / 'mixed' / 'commercial low' / 'commercial high' / 'office' / 'industrial') | a list (rotated street by street) "
+     "| {arterial, local}; families resolve to this game's zone types, preferring theme ('NA', 'EU'...; default: the style "
+     "zoned most nearby). services = [{type, count?, min_gap_m?, allow_subnets?}] (names from cs2_list_building_types; "
+     "buildings with built-in nets need allow_subnets=true and a save). preview=true drafts only: a map with the plan and "
+     "its zoning forecast + plan_id; cs2_build_district plan_id=... then builds exactly that draft. map=true adds one map of "
+     "the result. Take it all back with cs2_remove_district.",
+     {"type": "object", "properties": dict(AREA, polygon={"type": "array", "items": XZ}, angle_deg={"type": "number"},
+                                           preset={"type": "string", "enum": sorted(tools16.PRESETS)},
+                                           local_type={"type": "string"}, arterial_type={"type": "string", "description": "'none' = no arterials"},
+                                           arterial_every={"type": "integer"}, block_length_cells={"type": "integer"},
+                                           zoning_depth_cells={"type": "integer"}, max_grade={"type": "number"},
+                                           connected_only={"type": "boolean", "description": "drop pieces that join no existing street (default true)"},
+                                           connect_beyond_m={"type": "number", "description": "how far connectors may leave the outline to reach a street (default 250)"},
+                                           seed=XZ, origin=XZ, u_phase={"type": "number"}, v_phase={"type": "number"}, match_radius={"type": "number"},
+                                           zoning={"description": "false | zone name / family | list | {arterial, local} (default: the preset's)"},
+                                           theme={"type": "string", "description": "zone style region prefix to prefer, e.g. NA, EU, UK"},
+                                           services={"type": "array", "items": {"type": "object", "properties": {
+                                               "type": {"type": "string"}, "count": {"type": "integer"}, "min_gap_m": {"type": "number"},
+                                               "lot_m": {"type": "array", "items": {"type": "number"}}, "allow_subnets": {"type": "boolean"}},
+                                               "required": ["type"]}},
+                                           name={"type": "string", "description": "district name"},
+                                           policies={"type": "array", "items": {"type": "string"}, "description": "from cs2_list_district_policies"},
+                                           district={"type": "boolean", "description": "create a game district for the outline (default true)"},
+                                           preview={"type": "boolean"}, plan_id={"type": "string", "description": "build a draft made with preview=true"},
+                                           pause={"type": "boolean", "description": "pause the simulation while building (default true)"},
+                                           align={"type": "boolean", "description": "zero-crack flags on the new streets (default true)"},
+                                           check={"type": "boolean", "description": "dead ends / islands / zoned cells inside the outline afterwards (default true)"},
+                                           show={"type": "boolean", "description": "move the camera to the new district at the end (default true)"},
+                                           map={"type": "boolean"}, lattice={"type": "string", "enum": ["snap", "check", "off"]},
+                                           chunk_m={"type": "number"}, px={"type": "integer"})},
+     lambda a: tools16.build_district(rpc, a, _district_api())),
+    ("cs2_remove_district", "Take back a district made by cs2_build_district (plan_id, default the newest one): an exact "
+     "undo of its own history entries while they are still the newest ones of this city load; otherwise (or by_shape="
+     "true) by shape - its streets (their zoning goes with them), its service buildings (by type and position) and its "
+     "district outline. clear_buildings=true first bulldozes the buildings that grew inside the outline since (batches of "
+     "40, simulation paused). dry_run says what it would do.",
+     {"type": "object", "properties": {"plan_id": {"type": "string"}, "clear_buildings": {"type": "boolean"},
+                                       "by_shape": {"type": "boolean"}, "dry_run": {"type": "boolean"}}},
+     lambda a: tools16.remove_district(rpc, a, _district_api())),
+    ("cs2_batch", "Many tool calls in ONE call (v0.46): calls = [{tool, args}] run in order inside the server, so a known "
+     "sequence (zone five areas, place ten buildings, set policies...) costs one round trip instead of one per step. "
+     "fast (default true) turns the camera move and the post-build check off for builders that have them unless a call's "
+     "args say otherwise; pause = pause the simulation for the batch; stop_on_error (default true) stops at the first "
+     "failure. Each result comes back shortened (images dropped, max_chars per result, default 1500). Not allowed inside: "
+     "cs2_batch, cs2_restart_game, cs2_main_menu, cs2_load_save.",
+     {"type": "object", "properties": {"calls": {"type": "array", "items": {"type": "object", "properties": {
+                                           "tool": {"type": "string"}, "args": {"type": "object"}}, "required": ["tool"]}},
+                                       "stop_on_error": {"type": "boolean"}, "fast": {"type": "boolean"}, "pause": {"type": "boolean"},
+                                       "max_chars": {"type": "integer"}}, "required": ["calls"]},
+     lambda a: tools16.batch(rpc, a, _district_api())),
     ("cs2_raw", "Call a bridge method directly (debugging): ping, city_info, camera, camera_goto, set_speed, terrain_height, list_road_types, list_zone_types, query_roads, query_buildings, place_roads, bulldoze, replace_roads, zone, undo, history, screenshot, road_network, zone_blocks, terrain_grid, preview_commit, preview_cancel.",
      {"type": "object", "properties": {"method": {"type": "string"}, "params": {"type": "object"}}, "required": ["method"]}, t_raw),
 ]
@@ -1744,7 +1826,7 @@ def send(msg):
 # hot reload: when any server/*.py changes, reload the helper modules + this file's tool table and tell the client the
 # tool list changed - new tools become callable in the running session, no new Claude Code session needed.
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_HELPERS = ("geom", "survey", "tools2", "tools3", "tools4", "tools5", "tools6", "tools7", "tools8", "tools9", "tools10", "tools11", "tools13", "tools14", "tools15", "sites_tiled", "zoning", "assets")
+_HELPERS = ("geom", "survey", "tools2", "tools3", "tools4", "tools5", "tools6", "tools7", "tools8", "tools9", "tools10", "tools11", "tools13", "tools14", "tools15", "tools16", "sites_tiled", "zoning", "assets")
 
 
 def _mtimes():

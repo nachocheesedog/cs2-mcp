@@ -62,6 +62,12 @@ def settings():
     except (OSError, ValueError): return {}
 
 
+def fast():
+    """settings.json fast_mode (v0.46): builders skip the camera move, the post-build junction check and the dry-run
+    zoning forecast unless a call asks for them."""
+    return bool(settings().get("fast_mode"))
+
+
 ZONE_BATCH = 250
 
 
@@ -89,7 +95,8 @@ def zone_many(rpc, items, overwrite=True, dry_run=False, timeout_s=120):
 
 
 def follow(rpc, a, pts, default=None):
-    if default is None: default = settings().get("follow_camera", True)
+    if default is None:
+        s = settings(); default = s.get("follow_camera", True) and not s.get("fast_mode")
     if a.get("dry_run") or not a.get("follow_camera", default) or not pts: return
     xs = [p[0] for p in pts]; zs = [p[1] for p in pts]
     span = max(max(xs) - min(xs), max(zs) - min(zs))
@@ -449,6 +456,6 @@ def after_build(rpc, a, segs, info):
         import align
         al = align.after_build(rpc, segs)
         if al: info["zone_alignment"] = al
-    if a.get("check", True):
+    if a.get("check", not fast()):
         try: info["check"] = tools3.local_check(rpc, pts)
         except Exception as e: info["check"] = f"check failed: {e}"

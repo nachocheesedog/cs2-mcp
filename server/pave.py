@@ -57,10 +57,11 @@ def plan_fill(rpc, area, *, angle_deg=58.5, origin=(0.0, 0.0), pitch_u=120.0, pi
               local_type="Medium Road", arterial_type=None, arterial_every=4, shore_type=None, shore_setback=60.0,
               max_slope=0.40, max_grade=0.10, seed=None, polygon=None, res=8.0, clear_road=6.0, clear_major=20.0, clear_lot=6.0,
               min_run_m=150.0, junction_gap_m=35.0, min_angle_deg=None, connect_reach=1.6, keep_islands=False, debug_png=None, grid=True, rim=True,
-              perp_deg=80.0, min_angle_curved=60.0, approach_m=52.0):
+              perp_deg=80.0, min_angle_curved=60.0, approach_m=52.0, connect_beyond=0.0):
     """Plan a street lattice over the free land of `area` (survey.Area). Returns a dict with 'segments' (place_roads
     format, each with a 'phase': 'grid' | 'shore') and 'stats'. seed [x,z] picks the land mass (default: area centre);
-    polygon [[x,z],...] further limits the fill.
+    polygon [[x,z],...] further limits the fill. connect_beyond (m, v0.46) lets the connectors - not the lattice - leave
+    the polygon by up to that much, so an outline drawn a little short of the street it should join still joins it.
 
     Zoning rules built in (v0.27, learned from an early waterfront district):
     - a street joins another at >= perp_deg (80): when the lattice line would hit at a skew it bends so its last
@@ -120,10 +121,15 @@ def plan_fill(rpc, area, *, angle_deg=58.5, origin=(0.0, 0.0), pitch_u=120.0, pi
     si, sj = (int(v) for v in R.px(sx, sz))
     if not (0 <= si < W and 0 <= sj < H) or lab[sj, si] == 0: raise ValueError("seed is not on land inside the area")
     region = lab == lab[sj, si]
+    conn_zone = region                   # where connectors may run: the region, or the land a little beyond the polygon
     if polygon:
         pimg = R.new(); ImageDraw.Draw(pimg).polygon([R.px(*p) for p in polygon], fill=255)
-        region &= np.asarray(pimg) > 0
-    edge_pad = int(math.ceil(40 / res)); region[:edge_pad] = region[-edge_pad:] = False; region[:, :edge_pad] = region[:, -edge_pad:] = False
+        pmask = np.asarray(pimg) > 0
+        if connect_beyond > 0: conn_zone = region & (ndimage.distance_transform_edt(~pmask) * res <= connect_beyond)
+        region = region & pmask
+    edge_pad = int(math.ceil(40 / res))
+    for m_ in ((region,) if conn_zone is region else (region, conn_zone)):
+        m_[:edge_pad] = m_[-edge_pad:] = False; m_[:, :edge_pad] = m_[:, -edge_pad:] = False
     flat = slope <= max_slope            # ground a road may sit on at all (cliffs are not); the grade ALONG a road is max_grade
     hgt = R.terrain(w.grid, "heights")
 
@@ -159,14 +165,16 @@ def plan_fill(rpc, area, *, angle_deg=58.5, origin=(0.0, 0.0), pitch_u=120.0, pi
         return (d_water[ij] >= need_water and d_road[ij] >= half + clear_road and d_major[ij] >= half + clear_major
                 and d_cell[ij] >= half + 1 and d_lot[ij] >= half + clear_lot)
 
-    def path_free(p, q, half, need_water, skip_end=0.0, cells_ok=False):
-        """Every 4 m along p->q is buildable. The last skip_end metres may approach water/roads (a connector's target)."""
+    def path_free(p, q, half, need_water, skip_end=0.0, cells_ok=False, zone=None):
+        """Every 4 m along p->q is buildable. The last skip_end metres may approach water/roads (a connector's target).
+        zone = the mask the path must stay in (default the region; connectors pass `conn_zone`)."""
+        zone = region if zone is None else zone
         L = math.dist(p, q); n = max(2, int(L / 4))
         for k in range(n + 1):
             f = k / n
             x, z = p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f
             ij = at(x, z)
-            if ij is None or not region[ij] or not flat[ij] or water[ij]: return False
+            if ij is None or not zone[ij] or not flat[ij] or water[ij]: return False
             if d_lot[ij] < half + clear_lot or d_major[ij] < half + clear_major: return False
             if f * L <= L - skip_end:
                 if d_water[ij] < need_water or d_road[ij] < half + clear_road: return False
@@ -257,7 +265,7 @@ def plan_fill(rpc, area, *, angle_deg=58.5, origin=(0.0, 0.0), pitch_u=120.0, pi
         L = sum(math.dist(a, b) for a, b in zip(pts, pts[1:])); acc = 0.0
         for a_, b_ in zip(pts, pts[1:]):
             acc += math.dist(a_, b_)
-            if not path_free(a_, b_, half, 0, skip_end=max(0.0, skip_end - (L - acc)), cells_ok=skip_end > 0.1): return False
+            if not path_free(a_, b_, half, 0, skip_end=max(0.0, skip_end - (L - acc)), cells_ok=skip_end > 0.1, zone=conn_zone): return False
         return True
 
     def bend(p, d, hit, T, A, B, owners, owner_key, half, skip_end):
@@ -302,7 +310,7 @@ def plan_fill(rpc, area, *, angle_deg=58.5, origin=(0.0, 0.0), pitch_u=120.0, pi
                 b = bend(p, d, hit, B_s[si_] - A_s[si_], A_s, B_s, owner_s, lambda o, ri=ri: o[0] == ri, widths[typ] / 2, 0.1)
                 if b: hit = np.array(b["end"]); pi = owner_s[b["idx"]][1]; seg = b
                 elif ang < min_angle_curved: continue
-            if seg is None and not path_free(tuple(p), tuple(hit), widths[typ] / 2, 0, skip_end=0.1): continue
+            if seg is None and not path_free(tuple(p), tuple(hit), widths[typ] / 2, 0, skip_end=0.1, zone=conn_zone): continue
             if any(math.dist(hit, h) < junction_gap_m for _, h in shore_hits.get(ri, [])): continue
             shore_hits.setdefault(ri, []).append((pi, tuple(hit)))
             c = {"start": tuple(p), "end": tuple(map(float, hit)), "type": typ, "to": ("shore", ri), "from": n}
@@ -318,7 +326,7 @@ def plan_fill(rpc, area, *, angle_deg=58.5, origin=(0.0, 0.0), pitch_u=120.0, pi
                 b = bend(p, d, hit, B_e[ei_] - A_e[ei_], A_e, B_e, owner_e, lambda o, e=e: o[0] is e, widths[typ] / 2, skip)
                 if b: hit = np.array(b["end"]); seg = b
                 elif survey.is_straight(e["curve"]) or ang < min_angle_curved: continue
-            if seg is None and not path_free(tuple(p), tuple(hit), widths[typ] / 2, 0, skip_end=skip, cells_ok=True): continue
+            if seg is None and not path_free(tuple(p), tuple(hit), widths[typ] / 2, 0, skip_end=skip, cells_ok=True, zone=conn_zone): continue
             if len(node_pos):
                 dn = np.hypot(*(node_pos - hit).T); i = int(np.argmin(dn))
                 if dn[i] < 3: hit = node_pos[i]

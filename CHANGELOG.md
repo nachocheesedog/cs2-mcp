@@ -3,6 +3,25 @@
 Mod versions are in `mod/Bridge.cs` (`Version`). The server checks the mod's version (via `ping`) and falls back to older behaviour
 where it can, so a newer server works with an older mod.
 
+## 0.46 — one-call districts, batches, fast mode (server only, no mod rebuild)
+- `cs2_build_district`: a whole new district in one call — outline → zoning-perfect street grid (the
+  `cs2_district_grid` planner, snapped onto the zone lattice, joined to the streets around it) → zero-crack flags →
+  optional service buildings spread along the new streets → zoning of the new frontage by street role (arterial /
+  local, only empty cells) → game district with name and policies. The simulation is paused for the build and the
+  speed restored after; one preview of the whole plan stops it early when the money runs out; one compact report
+  instead of dozens of round trips. Presets (`suburb`, `residential`, `downtown`, `office`, `industrial`), zone families
+  resolved to the game's zone types by region theme, `preview=true` + `plan_id` to look first.
+- `cs2_remove_district`: takes such a district back out — an exact undo of its own history entries while they are the
+  newest, otherwise by shape (streets, service buildings, district); `clear_buildings` for what grew since.
+- `cs2_batch`: many tool calls in one MCP call, run in order inside the server, results shortened.
+- `cs2_settings fast_mode`: builders skip the camera move, the post-build junction check and the dry-run zoning
+  forecast unless a call asks for them.
+- `pave.plan_fill` / `cs2_district_grid`: `connect_beyond` / `connect_beyond_m` let connectors (not the grid) leave the
+  outline to reach a street, so an outline drawn a little short of the street it should join still joins it
+  (default 0 for `cs2_district_grid`, 250 m for `cs2_build_district`).
+- `skills/cs2-city-building`: a fast-path section; `docs/DISTRICT_BUILDER.md`; `server/test_build_district.py` runs the
+  whole flow against a fake game.
+
 ## 0.38 – 0.45 — skills, precision road tools, services, brands
 - **Skills library** (`skills/`): four Claude Code skills — city building, the Blender → game asset pipeline, Blender
   architecture modelling, and Paradox Mods publishing — with their helper scripts. See the README.

@@ -72,7 +72,7 @@ The server watches `server/*.py`. When a file changes it reloads every module in
 | `pave.py` | District grids, rim roads, connect options, plan build and removal. |
 | `zoning.py` | Zoning forecast (depth lost, dead gaps, shallow frontage), `cs2_zoning_check`. |
 | `align.py` | Zone-crack detection and the road half-alignment planner. |
-| `tools2.py` … `tools12.py` | Feature groups added over time: paths and pairs (2), ramps and extending lines (3), waterfronts (4), zoning and city health (5), services (6), transit (7), parks and objects (8), service sites (9), interchange design (10, 11), ribs (12). |
+| `tools2.py` … `tools16.py` | Feature groups added over time: paths and pairs (2), ramps and extending lines (3), waterfronts (4), zoning and city health (5), services (6), transit (7), parks and objects (8), service sites (9), interchange design (10, 11), ribs (12), road snapshots, profiles and junction detail (13), highway forks (14), waterfront backs and bulk upgrades (15), one-call districts and batches (16 — it gets this module's planner and builders through `_district_api()`, resolved at call time so hot reload keeps working). |
 | `assets.py`, `fbx_raw.py` | Offline FBX and texture validation, import orchestration, `_meta.json` and icon application. |
 | `gamesession.py` | Restarting the game through Steam, waiting for the menu, loading a save. |
 
