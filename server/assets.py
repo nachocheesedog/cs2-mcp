@@ -133,7 +133,7 @@ def _parse_name(stem):
 def _meta(directory, a=None):
     """Build-menu metadata for an asset: explicit args win, else <project_root>_build/<Name>_meta.json + <Name>_Icon.png."""
     a = a or {}
-    d = os.path.abspath(directory); name = os.path.basename(d.rstrip("\/")); build = os.path.dirname(d) + "_build"
+    d = os.path.abspath(directory); name = os.path.basename(d.rstrip(r"\/")); build = os.path.dirname(d) + "_build"
     path = a.get("meta") or os.path.join(build, name + "_meta.json")
     m = {}
     if os.path.isfile(path):

@@ -1,6 +1,6 @@
 ---
 name: cs2-city-building
-description: Building and fixing a running Cities Skylines II (CS2) city through the CS2 MCP - road layouts that zone perfectly (grids, curved waterfronts, back streets, ribs), zoning a district, demolishing/rebuilding a district safely, highway junctions and interchanges designed per site, city services (healthcare / deathcare / hearses, crematoria placement), and working alongside other CS2 sessions without crashing the game. Use it whenever the user asks to lay out, rebuild, refactor, zone or fix a district, streets, blocks, a waterfront, a highway connection or interchange, or asks why buildings won't grow, why zoning has gaps, why hearses / ambulances are overwhelmed, or where to place a service building - even if they only mention one street or one icon.
+description: Building and fixing a running Cities Skylines II (CS2) city through the CS2 MCP - a whole new district in one call (cs2_build_district), road layouts that zone perfectly (grids, curved waterfronts, back streets, ribs), zoning a district, demolishing/rebuilding a district safely, highway junctions and interchanges designed per site, city services (healthcare / deathcare / hearses, crematoria placement), and working alongside other CS2 sessions without crashing the game. Use it whenever the user asks to lay out, rebuild, refactor, zone or fix a district, streets, blocks, a waterfront, a highway connection or interchange, or asks why buildings won't grow, why zoning has gaps, why hearses / ambulances are overwhelmed, or where to place a service building - even if they only mention one street or one icon.
 ---
 
 # CS2 city building through the MCP
@@ -9,6 +9,34 @@ Lessons from rebuilding and zoning large districts (curved waterfront districts,
 large, dense cities) through the CS2 MCP. Rules marked **STANDING** are recommended practice - follow them unless the
 project needs otherwise. Code lives in this repo: the C# game mod in `mod/`, the Python MCP server in `server/`; layout
 rules + code map in `docs/ROAD_LAYOUT.md`.
+
+## 0. Fast path - a whole new district in one call (STANDING)
+
+When the user wants a new area built ("build a district here", "fill this land with housing"), do NOT lay
+streets, zone and place services step by step - that is dozens of round trips and the session drifts into polishing
+details. Use `cs2_build_district` (docs/DISTRICT_BUILDER.md):
+
+1. Where: when the user names no place, give no outline - the tool picks free land next to the streets itself
+   (`site='auto'`: straight on from a dead end or past an empty street side, nearest the camera, checked against city
+   limits and money). To show options first, one `cs2_district_sites` call (a numbered map) and pass the chosen site
+   (`site=<that site object>`). When the user names a place, give `polygon` (or `center` + `size`) on free land that
+   touches or nearly touches existing streets (connectors may leave it by `connect_beyond_m`, default 250); if its
+   grid reaches no street, the tool lays it out from a dead end that reaches into it. No screenshots to choose.
+2. One call: `cs2_build_district polygon=... preset=suburb|residential|downtown|office|industrial name=...
+   services=[...]`. Add `preview=true` only when the user wants to see the draft first; then build it with
+   `plan_id`. The tool pauses the sim, builds streets -> zero-crack flags -> services -> zoning -> district, restores
+   the speed and reports. It zones because a new district was asked for; pass `zoning=false` when the user only wants
+   the streets (rule 7 below).
+3. Read the report, not a screenshot: `roads.refused`, `check.fix_these` (dead ends a refused street left),
+   `check.islands`, `zoning`. Fix only those; the other dead ends are stubs at the outline (room to grow), and cosmetic
+   junction findings stay alone unless the user asks.
+4. Wrong place or wrong style: `cs2_remove_district` (exact undo while its entries are the newest), then build again
+   - cheaper than repairing.
+
+For a known sequence of small edits (policies, a few zones, several buildings) use one `cs2_batch` instead of one call
+each. For a long building session, `cs2_settings fast_mode=true` stops builders from moving the camera and checking
+after every edit; switch it off for careful detail work. The rules below still decide the details when the user asks
+for hand-made layouts.
 
 ## 1. Zoning geometry - the rules (STANDING)
 
