@@ -73,15 +73,18 @@ class Land:
     def __init__(self, rpc, box, net=None, res=None, max_slope=0.25):
         x0, z0, x1, z1 = box
         self.area = A = survey.Area(x0, z0, x1, z1)
-        span = max(x1 - x0, z1 - z0)
-        self.res = res = float(res or (8.0 if span <= 5000 else 12.0 if span <= 8000 else 16.0))
+        # 8 m even for a whole map (1792 px a side, ~160 MB at peak): at 16 m a gap of one house reads as clear, and in a
+        # 300k-pop test city the coarse raster passed ~30x more "ways in" than the planner then accepted
+        self.res = res = float(res or 8.0)
         self.R = R = survey.Raster(A, res)
         H, W = R.H, R.W
-        net = net or rpc("road_network", dict(A.params, limit=80000))
+        net = net or rpc("road_network", dict(A.params, limit=150000))
         self.truncated = bool(net.get("edges_in_area") and net.get("returned") and net["edges_in_area"] > net["returned"])
         self.edges = [e for e in net["edges"] if not any(k in (e.get("type") or "") for k in UTILITY)]
         self.nodes = {n["id"]: n for n in net["nodes"]}
-        self.buildings = rpc("query_buildings", dict(A.params, limit=80000)).get("buildings", [])
+        bl = rpc("query_buildings", dict(A.params, limit=200000))
+        self.buildings = bl.get("buildings", [])
+        self.truncated = self.truncated or bool(bl.get("total_in_area") and bl.get("returned") and bl["total_in_area"] > bl["returned"])
         step = 16
         while ((x1 - x0) / step + 1) * ((z1 - z0) / step + 1) > 85000: step += 8
         self.grid = rpc("terrain_grid", dict(A.params, step=step))
@@ -294,7 +297,7 @@ def find_sites(rpc, *, local_type, widths, first_w, pitch_u, pitch_v, size=600.0
         elif near is not None and radius:
             box = [near[0] - radius, near[1] - radius, near[0] + radius, near[1] + radius]; net = None
         else:
-            net = rpc("road_network", {"xmin": -MAP, "zmin": -MAP, "xmax": MAP, "zmax": MAP, "limit": 80000})
+            net = rpc("road_network", {"xmin": -MAP, "zmin": -MAP, "xmax": MAP, "zmax": MAP, "limit": 150000})
             box = city_box([e for e in net["edges"] if not any(k in (e.get("type") or "") for k in UTILITY)], size + 300)
             if box is None: return {"sites": [], "found": {"streets": 0}, "reason": "no streets in this city yet", "seconds": round(time.time() - t0, 1)}
         box = [max(-MAP, box[0]), max(-MAP, box[1]), min(MAP, box[2]), min(MAP, box[3])]
@@ -306,19 +309,32 @@ def find_sites(rpc, *, local_type, widths, first_w, pitch_u, pitch_v, size=600.0
         import tools2
         poly_in = lambda p: tools2._in_poly(p, polygon)
     cands = []
-    for an in ancs:
-        v1 = first_cross(an, first_w)
+    v1s = [first_cross(an, first_w) for an in ancs]
+    comps = near_j = None
+    if not polygon and ancs:                           # the quick tests for all anchors at once (a big city has ~50k)
+        PP = np.array([an["pos"] for an in ancs]); DD = np.array([an["dir"] for an in ancs]); VV = np.array(v1s) + 24.0
+        comps = land.sample(land.free_lab, PP[:, 0] + DD[:, 0] * VV, PP[:, 1] + DD[:, 1] * VV, np.int32(0))
+        near_j = np.zeros(len(ancs), bool)
+        side = np.array([an["kind"] == "side" for an in ancs])
+        if land.node_tree is not None and side.any():
+            dj, _ = land.node_tree.query(PP[side]); near_j[np.where(side)[0][dj < 38]] = True
+    for idx, an in enumerate(ancs):
+        v1 = v1s[idx]
         P, D = an["pos"], an["dir"]
         if polygon:                                    # must reach into the outline within connect_beyond
             s_in = next((s for s in np.arange(0.0, connect_beyond + 60, 8.0) if poly_in((P[0] + D[0] * s, P[1] + D[1] * s))), None)
             if s_in is None: continue
             v1 = max(v1, s_in + first_w / 2 + 24)
+            b = (P[0] + D[0] * (v1 + 24), P[1] + D[1] * (v1 + 24))
+            comp = int(land.sample(land.free_lab, [b[0]], [b[1]], np.int32(0))[0])
+        else:
+            comp = int(comps[idx])
         # quick test: is there free land just past the first cross street? (its stretch is what the site may count)
-        b = (P[0] + D[0] * (v1 + 24), P[1] + D[1] * (v1 + 24))
-        comp = int(land.sample(land.free_lab, [b[0]], [b[1]], np.int32(0))[0])
         if not comp: continue
         found["free_land_beyond"] += 1
-        if an["kind"] == "side" and land.node_tree is not None and land.node_tree.query(P)[0] < 38: found["near_a_junction"] += 1; continue
+        if an["kind"] == "side" and (near_j[idx] if near_j is not None else
+                                     (land.node_tree is not None and land.node_tree.query(P)[0] < 38)):
+            found["near_a_junction"] += 1; continue
         if an["kind"] == "dead_end" and not polygon:   # line the first cross street up with the old street behind
             v1 = first_cross(an, first_w, land.behind(an))
         why = land.spine(an, half, v1, max_grade)
@@ -373,7 +389,7 @@ def find_sites(rpc, *, local_type, widths, first_w, pitch_u, pitch_v, size=600.0
     for i, st in enumerate(sites): st["rank"] = i + 1
     out = {"sites": sites, "found": dict(found), "box": [round(v) for v in (land.area.x0, land.area.z0, land.area.x1, land.area.z1)],
            "seconds": round(time.time() - t0, 1)}
-    if land.truncated: out["warning"] = "the city has more streets than one survey returns - pass near + radius to look at one part"
+    if land.truncated: out["warning"] = "the city has more streets / buildings than one survey returns - pass near + radius to look at one part"
     out["_land"] = land
     return out
 
