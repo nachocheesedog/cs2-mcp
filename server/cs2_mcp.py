@@ -6,7 +6,7 @@ Tools: status, camera, terrain heights, road types, road query, road placement a
 World coordinates are CS2's: x/z horizontal in metres, y up. Zoning cells are 8 m.
 """
 import base64, json, math, os, sys, time, urllib.request, urllib.error
-import survey, tools2, tools3, tools4, tools5, tools6, tools7, tools8, tools9, tools10, tools11, tools13, tools14, tools15, assets
+import survey, tools2, tools3, tools4, tools5, tools6, tools7, tools8, tools9, tools10, tools11, tools13, tools14, tools15, assets, autofix
 
 BRIDGE = "http://127.0.0.1:17654"
 PROTOCOL = "2024-11-05"
@@ -279,9 +279,15 @@ def t_place_roads(a):
         if bad: out["refused_segments"] = bad[:50]
         tools2.after_build(rpc, a, segs, out)
         return dict(out, **extra)
-    res = rpc("place_roads", {"segments": segs, "snap_tolerance": a.get("snap_tolerance", 2.0),
-                              "dry_run": a.get("dry_run", False), "allow_errors": a.get("allow_errors", False),
-                              "hold": a.get("hold", False), "no_intersections": a.get("no_intersections", False), "timeout_s": 90})
+    params = {"snap_tolerance": a.get("snap_tolerance", 2.0),
+              "dry_run": a.get("dry_run", False), "allow_errors": a.get("allow_errors", False),
+              "hold": a.get("hold", False), "no_intersections": a.get("no_intersections", False), "timeout_s": 90}
+    res = rpc("place_roads", dict(params, segments=segs))
+    # a preview (dry_run / hold) with errors is fixed here, not handed back: segments on an error position are dropped
+    # and the preview is redone until it is clean (auto_fix=false turns this off; auto_fix_rounds / auto_fix_radius tune it).
+    if res.get("errors") and (a.get("dry_run") or a.get("hold")) and a.get("auto_fix", True):
+        segs, res, fix = autofix.run(rpc, segs, params, res, int(a.get("auto_fix_rounds", 4)), float(a.get("auto_fix_radius", autofix.RADIUS)))
+        extra["auto_fix"] = fix
     if res.get("errors") and a.get("explain_errors", True): res["error_hits"] = tools2.explain_errors(rpc, res)
     if res.get("error_locations") and not a.get("verbose"): res["error_locations"] = res["error_locations"][:30]
     out = dict(compact(res, a), **extra)
@@ -881,6 +887,9 @@ TOOLS = [
          "snap_tolerance": {"type": "number"}, "dry_run": {"type": "boolean"}, "allow_errors": {"type": "boolean"},
          "hold": {"type": "boolean", "description": "leave the preview on screen; then cs2_preview_commit / cs2_preview_cancel"},
          "no_intersections": {"type": "boolean", "description": "do not join roads this crosses (default: crossings become junctions)"},
+         "auto_fix": {"type": "boolean", "description": "dry_run / hold with errors: drop the segments that sit on an error position and preview again until clean (default true); the result lists what was dropped and any group left unconnected. A held preview that cannot be cleaned is cancelled"},
+         "auto_fix_rounds": {"type": "integer", "description": "max fix-and-preview rounds (default 4)"},
+         "auto_fix_radius": {"type": "number", "description": "a segment closer than this many metres to an error position is dropped (default 12)"},
          "skip_failing": {"type": "boolean", "description": "if the game refuses the batch, find the refused segments by bisecting with dry runs, build the rest and return the refused ones"},
          "verbose": {"type": "boolean", "description": "include created_ids (default: just their count)"}}}, t_place_roads),
     ("cs2_district_grid", "Draft ONE district's street grid inside an outline you chose (polygon [[x,z],...], or an area box). You "

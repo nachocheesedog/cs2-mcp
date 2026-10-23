@@ -549,6 +549,9 @@ Place road segments [{start:[x,z], end:[x,z], type?, control?:[x,z] (quadratic c
 | `allow_errors` | boolean |  |
 | `hold` | boolean | leave the preview on screen; then cs2_preview_commit / cs2_preview_cancel |
 | `no_intersections` | boolean | do not join roads this crosses (default: crossings become junctions) |
+| `auto_fix` | boolean | dry_run / hold with errors: drop the segments that sit on an error position and preview again until clean (default true); the result lists what was dropped and any group left unconnected. A held preview that cannot be cleaned is cancelled |
+| `auto_fix_rounds` | integer | max fix-and-preview rounds (default 4) |
+| `auto_fix_radius` | number | a segment closer than this many metres to an error position is dropped (default 12) |
 | `skip_failing` | boolean | if the game refuses the batch, find the refused segments by bisecting with dry runs, build the rest and return the refused ones |
 | `verbose` | boolean | include created_ids (default: just their count) |
 

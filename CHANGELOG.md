@@ -3,6 +3,12 @@
 Mod versions are in `mod/Bridge.cs` (`Version`). The server checks the mod's version (via `ping`) and falls back to older behaviour
 where it can, so a newer server works with an older mod.
 
+## Unreleased
+- `cs2_place_roads auto_fix`: a preview with errors is fixed by the server — draft segments within
+  `auto_fix_radius` (12 m) of an error position are dropped and the preview is redone, up to `auto_fix_rounds` (4) times — so the caller only
+  sees a clean preview. The result reports `auto_fix` (rounds, dropped segments, groups left unconnected to the existing network); a held
+  preview that cannot be cleaned is cancelled. Server only (`server/autofix.py`, test: `server/test_autofix.py`).
+
 ## 0.38 – 0.45 — skills, precision road tools, services, brands
 - **Skills library** (`skills/`): four Claude Code skills — city building, the Blender → game asset pipeline, Blender
   architecture modelling, and Paradox Mods publishing — with their helper scripts. See the README.
