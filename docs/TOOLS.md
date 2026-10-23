@@ -1,6 +1,6 @@
 # Tool reference
 
-All 124 tools the `cs2` MCP server exposes, generated from the server's registry by `tools/gen_tools_doc.py`. `*` = required parameter.
+All 126 tools the `cs2` MCP server exposes, generated from the server's registry by `tools/gen_tools_doc.py`. `*` = required parameter.
 
 Conventions: world coordinates are the game's (x/z horizontal in metres, y up); zoning cells are 8 m. Every editing tool accepts `dry_run` (preview + error reasons, nothing built) and most accept `hold` (keep the preview until `cs2_preview_commit` / `cs2_preview_cancel`). Edits return an `undo_id` for `cs2_undo`.
 
@@ -344,6 +344,19 @@ List existing road segments whose ends fall in an x/z box.
 | `zmax` | number |  |
 | `limit` | integer |  |
 
+### `cs2_street_names`
+
+Streets in an x/z box (needs a rebuilt mod): each street's internal id (the game's road aggregate), the name the game shows (the player's custom name, else the rendered label), whether it is a custom name, how many road edges and metres it has and its road types. Edges outside any street (highways, ramps) are only counted. edges=true also lists each street's edge ids (match them with cs2_query_roads).
+
+| Parameter | Type | Description |
+|---|---|---|
+| `xmin` | number |  |
+| `zmin` | number |  |
+| `xmax` | number |  |
+| `zmax` | number |  |
+| `limit` | integer | max streets returned (default 200) |
+| `edges` | boolean | also list each street's edge ids |
+
 ### `cs2_query_buildings`
 
 List buildings whose position is inside an x/z box (id, type, position).
@@ -527,6 +540,15 @@ Where the water is along a road or path: every spacing_m (default 50) the distan
 | `probe_m` | number |  |
 
 ## Roads and networks
+
+### `cs2_rename_streets`
+
+Rename streets (needs a rebuilt mod): renames=[{id, new_name}] with ids from cs2_street_names (the street, not an edge). Sets the player's custom name, the same as the info panel. dry_run=true only reports was/name without changing anything.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `renames` * | object[] |  |
+| `dry_run` | boolean |  |
 
 ### `cs2_place_roads`
 

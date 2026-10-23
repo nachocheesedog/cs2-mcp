@@ -189,6 +189,8 @@ namespace CS2MCP
                 case "delete_areas": RequireCity(); m_Tool.Submit(cmd, BuildDeleteAreas(p)); return;
                 case "list_zone_types": cmd.Complete(ListZoneTypes()); return;
                 case "query_roads": RequireCity(); cmd.Complete(QueryRoads(p)); return;
+                case "street_names": RequireCity(); cmd.Complete(StreetNames(p)); return;
+                case "rename_streets": RequireCity(); cmd.Complete(RenameStreets(p)); return;
                 case "query_buildings": RequireCity(); cmd.Complete(QueryBuildings(p)); return;
                 case "history": cmd.Complete(History()); return;
                 case "place_roads": RequireCity(); m_Tool.Submit(cmd, BuildPlace(p, recordUndo: true)); return;

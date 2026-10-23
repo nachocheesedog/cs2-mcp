@@ -221,6 +221,14 @@ def t_query_roads(a):
     return rpc("query_roads", {k: a[k] for k in ("xmin", "zmin", "xmax", "zmax", "limit") if k in a})
 
 
+def t_street_names(a):
+    return rpc("street_names", {k: a[k] for k in ("xmin", "zmin", "xmax", "zmax", "limit", "edges") if k in a})
+
+
+def t_rename_streets(a):
+    return rpc("rename_streets", {k: a[k] for k in ("renames", "dry_run") if k in a})
+
+
 def compact(res, a):
     """Drop bulky id lists unless the caller asked for verbose output (token saver)."""
     if a.get("verbose") or not isinstance(res, dict): return res
@@ -862,6 +870,18 @@ TOOLS = [
     ("cs2_query_roads", "List existing road segments whose ends fall in an x/z box.",
      {"type": "object", "properties": {"xmin": {"type": "number"}, "zmin": {"type": "number"}, "xmax": {"type": "number"},
                                        "zmax": {"type": "number"}, "limit": {"type": "integer"}}}, t_query_roads),
+    ("cs2_street_names", "Streets in an x/z box (needs a rebuilt mod): each street's internal id (the game's road aggregate), the name the game shows "
+     "(the player's custom name, else the rendered label), whether it is a custom name, how many road edges and metres it has and its road "
+     "types. Edges outside any street (highways, ramps) are only counted. edges=true also lists each street's edge ids "
+     "(match them with cs2_query_roads).",
+     {"type": "object", "properties": {"xmin": {"type": "number"}, "zmin": {"type": "number"}, "xmax": {"type": "number"},
+                                       "zmax": {"type": "number"}, "limit": {"type": "integer", "description": "max streets returned (default 200)"},
+                                       "edges": {"type": "boolean", "description": "also list each street's edge ids"}}}, t_street_names),
+    ("cs2_rename_streets", "Rename streets (needs a rebuilt mod): renames=[{id, new_name}] with ids from cs2_street_names (the street, not an edge). "
+     "Sets the player's custom name, the same as the info panel. dry_run=true only reports was/name without changing anything.",
+     {"type": "object", "properties": {"renames": {"type": "array", "items": {"type": "object", "properties": {
+         "id": {"type": "string"}, "new_name": {"type": "string"}}, "required": ["id", "new_name"]}}, "dry_run": {"type": "boolean"}},
+      "required": ["renames"]}, t_rename_streets),
     ("cs2_place_roads", "Place road segments [{start:[x,z], end:[x,z], type?, control?:[x,z] (quadratic curve), controls?:[[x,z],[x,z]] "
      "(cubic curve)}] inline or from segments_file. Endpoints within snap_tolerance of existing nodes/roads connect to them; "
      "an end landing on another new segment of the batch makes a T junction; utilities (pipes, power lines) are ignored. The game previews first; if the "

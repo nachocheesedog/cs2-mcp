@@ -3,6 +3,11 @@
 Mod versions are in `mod/Bridge.cs` (`Version`). The server checks the mod's version (via `ping`) and falls back to older behaviour
 where it can, so a newer server works with an older mod.
 
+## Unreleased
+- `cs2_street_names`: streets in an area with their internal id and the name the game shows (custom name, else the rendered
+  label), read from each road edge's `Aggregated` street through `NameSystem`. Needs a rebuilt mod (`mod/Streets.cs`).
+- `cs2_rename_streets`: sets custom street names by street id (from `cs2_street_names`) through `NameSystem`; `dry_run` previews.
+
 ## 0.38 – 0.45 — skills, precision road tools, services, brands
 - **Skills library** (`skills/`): four Claude Code skills — city building, the Blender → game asset pipeline, Blender
   architecture modelling, and Paradox Mods publishing — with their helper scripts. See the README.

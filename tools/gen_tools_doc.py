@@ -7,8 +7,8 @@ import cs2_mcp
 CATEGORIES = [
     ("Game, session and camera", "status camera camera_goto set_speed settings list_saves load_save main_menu restart_game history tool_reset raw"),
     ("Seeing the city", "screenshot photo_mode map tour inspect traffic demand zone_summary zone_report building_warnings building_status"),
-    ("Raw data and catalogues", "terrain_height terrain_grid road_network zone_blocks query_roads query_buildings list_road_types list_zone_types list_building_types list_object_types list_districts list_district_policies obstacles pillars areas building_nets refs frame shore shore_points"),
-    ("Roads and networks", "place_roads place_grid place_circle place_path place_pair place_lines place_arcs extend_lines offset_road rim_road ramp trim replace_roads district_grid connect_options build_plan remove_plan probe place_piers place_along_shore building_access design_path network_check site_movements road_align road_snapshot road_restore road_profile node_detail highway_fork path_test"),
+    ("Raw data and catalogues", "terrain_height terrain_grid road_network zone_blocks query_roads street_names query_buildings list_road_types list_zone_types list_building_types list_object_types list_districts list_district_policies obstacles pillars areas building_nets refs frame shore shore_points"),
+    ("Roads and networks", "rename_streets place_roads place_grid place_circle place_path place_pair place_lines place_arcs extend_lines offset_road rim_road ramp trim replace_roads district_grid connect_options build_plan remove_plan probe place_piers place_along_shore building_access design_path network_check site_movements road_align road_snapshot road_restore road_profile node_detail highway_fork path_test"),
     ("Zoning", "zone zone_along zone_palette rezone rezone_buildings zone_snapshot zoning_check zone_cracks waterfront_backs"),
     ("Buildings, objects, terrain and areas", "place_building place_objects bulldoze terraform delete_areas"),
     ("Districts", "create_district delete_district rename_district set_district_policy"),
