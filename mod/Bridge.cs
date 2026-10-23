@@ -40,6 +40,8 @@ namespace CS2MCP
             {
                 var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "AppData", "LocalLow", "Colossal Order", "Cities Skylines II", "Logs");
                 Directory.CreateDirectory(dir); _path = Path.Combine(dir, "CS2MCP.log");
+                // keep the previous session's log: after a crash it holds the last commands that reached the game
+                try { if (File.Exists(_path)) File.Copy(_path, Path.Combine(dir, "CS2MCP-prev.log"), true); } catch { }
                 File.WriteAllText(_path, "");
             }
             catch { _path = null; }

@@ -3,6 +3,14 @@
 Mod versions are in `mod/Bridge.cs` (`Version`). The server checks the mod's version (via `ping`) and falls back to older behaviour
 where it can, so a newer server works with an older mod.
 
+## Unreleased
+- Crash trail: the mod now logs every command to `CS2MCP.log` as `> method key=value ...` before it runs and `< method N ms` after
+  (`status` is skipped; lists show only their length), and keeps the previous session's log as `CS2MCP-prev.log` instead of wiping it at
+  startup. After a crash the last `>` without a `<` is the call that was running. Needs a rebuilt mod (`mod/Bridge.cs`, `mod/McpBridgeSystem.cs`).
+- Crash evidence: when the bridge refuses or resets the connection (not a timeout) the server copies `Player.log`, `Player-prev.log`,
+  `CS2MCP.log` and `CS2MCP-prev.log` once per outage into `~/cs2mcp-crashes/<timestamp>/` (`$CS2MCP_CRASH_DIR`; game logs found under
+  `$CS2_LOG_DIR` or `/mnt/c/Users/*/AppData/LocalLow/...`) and says so in the error. Server only (`server/crashlog.py`, test: `server/test_crashlog.py`).
+
 ## 0.38 – 0.45 — skills, precision road tools, services, brands
 - **Skills library** (`skills/`): four Claude Code skills — city building, the Blender → game asset pipeline, Blender
   architecture modelling, and Paradox Mods publishing — with their helper scripts. See the README.

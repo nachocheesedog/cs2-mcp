@@ -6,7 +6,7 @@ Tools: status, camera, terrain heights, road types, road query, road placement a
 World coordinates are CS2's: x/z horizontal in metres, y up. Zoning cells are 8 m.
 """
 import base64, json, math, os, sys, time, urllib.request, urllib.error
-import survey, tools2, tools3, tools4, tools5, tools6, tools7, tools8, tools9, tools10, tools11, tools13, tools14, tools15, assets
+import survey, tools2, tools3, tools4, tools5, tools6, tools7, tools8, tools9, tools10, tools11, tools13, tools14, tools15, assets, crashlog
 
 BRIDGE = "http://127.0.0.1:17654"
 PROTOCOL = "2024-11-05"
@@ -38,7 +38,10 @@ def _rpc_once(method, params=None, timeout=90):
         except Exception: raise BridgeError(f"HTTP {e.code}")
         raise BridgeError(data.get("error", f"HTTP {e.code}"))
     except (urllib.error.URLError, ConnectionError, TimeoutError) as e:
-        raise BridgeError(f"cannot reach the CS2MCP mod at {BRIDGE} ({e}). Is Cities: Skylines II running with the CS2MCP mod enabled?")
+        saved = crashlog.snapshot(f"bridge unreachable during '{method}': {e}") if crashlog.is_crash(e) else None
+        raise BridgeError(f"cannot reach the CS2MCP mod at {BRIDGE} ({e}). Is Cities: Skylines II running with the CS2MCP mod enabled?"
+                          + (f" Game logs saved to {saved} (last '>' line of CS2MCP.log = the call that was running)." if saved else ""))
+    crashlog.alive()
     if "error" in data: raise BridgeError(data["error"])
     return data.get("result")
 

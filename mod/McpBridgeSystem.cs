@@ -133,10 +133,34 @@ namespace CS2MCP
                 {
                     if (GameLoading && !kAllowedWhileLoading.Contains(cmd.Method))
                         cmd.Fail("the game is loading a save - retry once status shows loading=false and city_loaded=true");
-                    else Dispatch(cmd);
+                    else
+                    {
+                        // written (and flushed) before the call runs, so a crash leaves the culprit as the last ">" line without a "<"
+                        bool quiet = cmd.Method == "status";
+                        var t0 = DateTime.UtcNow;
+                        if (!quiet) Log.Info("> " + cmd.Method + CallSummary(cmd.Params));
+                        Dispatch(cmd);
+                        if (!quiet) Log.Info($"< {cmd.Method} {(DateTime.UtcNow - t0).TotalMilliseconds:0} ms");
+                    }
                 }
                 catch (Exception e) { Log.Info($"{cmd.Method} failed: {e}"); cmd.Fail(e.GetType().Name + ": " + e.Message); }
             }
+        }
+
+        // short description of a call's size for the crash trail: flags and list lengths, never the full payload
+        static string CallSummary(Dictionary<string, object> p)
+        {
+            if (p == null || p.Count == 0) return "";
+            var sb = new System.Text.StringBuilder();
+            foreach (var kv in p)
+            {
+                if (sb.Length > 160) { sb.Append(" ..."); break; }
+                sb.Append(' ').Append(kv.Key).Append('=');
+                if (kv.Value is System.Collections.ICollection c) sb.Append('[').Append(c.Count).Append(']');
+                else if (kv.Value is string str) sb.Append(str.Length > 24 ? str.Substring(0, 24) + "~" : str);
+                else sb.Append(kv.Value);
+            }
+            return sb.ToString();
         }
 
         bool CityLoaded => m_City.City != Entity.Null && EntityManager.Exists(m_City.City);
