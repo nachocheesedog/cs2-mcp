@@ -6,7 +6,7 @@ Tools: status, camera, terrain heights, road types, road query, road placement a
 World coordinates are CS2's: x/z horizontal in metres, y up. Zoning cells are 8 m.
 """
 import base64, json, math, os, sys, time, urllib.request, urllib.error
-import survey, tools2, tools3, tools4, tools5, tools6, tools7, tools8, tools9, tools10, tools11, tools13, tools14, tools15, assets
+import survey, tools2, tools3, tools4, tools5, tools6, tools7, tools8, tools9, tools10, tools11, tools13, tools14, tools15, assets, autofix, cola
 
 BRIDGE = "http://127.0.0.1:17654"
 PROTOCOL = "2024-11-05"
@@ -279,17 +279,31 @@ def t_place_roads(a):
         if bad: out["refused_segments"] = bad[:50]
         tools2.after_build(rpc, a, segs, out)
         return dict(out, **extra)
-    res = rpc("place_roads", {"segments": segs, "snap_tolerance": a.get("snap_tolerance", 2.0),
-                              "dry_run": a.get("dry_run", False), "allow_errors": a.get("allow_errors", False),
-                              "hold": a.get("hold", False), "no_intersections": a.get("no_intersections", False), "timeout_s": 90})
+    params = {"snap_tolerance": a.get("snap_tolerance", 2.0),
+              "dry_run": a.get("dry_run", False), "allow_errors": a.get("allow_errors", False),
+              "hold": a.get("hold", False), "no_intersections": a.get("no_intersections", False), "timeout_s": 90}
+    res = rpc("place_roads", dict(params, segments=segs))
+    # a preview (dry_run / hold) with errors is fixed here, not handed back: segments on an error position are dropped
+    # and the preview is redone until it is clean (auto_fix=false turns this off; auto_fix_rounds / auto_fix_radius tune it).
+    if res.get("errors") and (a.get("dry_run") or a.get("hold")) and a.get("auto_fix", True):
+        segs, res, fix = autofix.run(rpc, segs, params, res, int(a.get("auto_fix_rounds", 4)), float(a.get("auto_fix_radius", autofix.RADIUS)), a.get("auto_fix_ignore"))
+        extra["auto_fix"] = fix
     if res.get("errors") and a.get("explain_errors", True): res["error_hits"] = tools2.explain_errors(rpc, res)
     if res.get("error_locations") and not a.get("verbose"): res["error_locations"] = res["error_locations"][:30]
+    if a.get("return_segments"): extra["segments_kept"] = segs         # the cleaned draft (after lattice + auto_fix), for cs2_queue_add
     out = dict(compact(res, a), **extra)
     if res.get("applied"): tools2.after_build(rpc, a, segs, out)
     if a.get("dry_run") and a.get("zoning_check", True) and segs:
         try: out["zoning_forecast"] = _forecast_for(segs)
         except Exception as ex: out["zoning_forecast"] = {"error": str(ex)}
     return out
+
+
+def t_queue_add(a): return cola.add(a, t_place_roads, rpc)
+def t_queue_add_batch(a): return cola.add_batch(a, t_place_roads, rpc)
+def t_queue_list(a): return cola.listing(a)
+def t_queue_remove(a): return cola.remove(a)
+def t_queue_commit(a): return cola.commit(a, rpc, t_place_roads, t_zone_along, t_inspect)
 
 
 def t_grid(a):
@@ -862,6 +876,36 @@ TOOLS = [
     ("cs2_query_roads", "List existing road segments whose ends fall in an x/z box.",
      {"type": "object", "properties": {"xmin": {"type": "number"}, "zmin": {"type": "number"}, "xmax": {"type": "number"},
                                        "zmax": {"type": "number"}, "limit": {"type": "integer"}}}, t_query_roads),
+    ("cs2_queue_add", "Stage a road design WITHOUT building it: previews it as a dry_run with auto_fix and stores the cleaned segments (plus an optional zoning spec) "
+     "in the design queue. Same segment arguments as cs2_place_roads (segments / segments_file, type, snap_tolerance, lattice options...). Segments that cross or overlap a design "
+     "already staged are dropped (first come first served). Stage 2-4 designs, review them with cs2_queue_list, then build them all with ONE cs2_queue_commit.",
+     {"type": "object", "properties": {
+         "name": {"type": "string", "description": "unique name of the design"},
+         "segments": {"type": "array", "items": {"type": "object"}}, "segments_file": {"type": "string"}, "type": {"type": "string"},
+         "snap_tolerance": {"type": "number"}, "auto_fix_rounds": {"type": "integer"}, "auto_fix_radius": {"type": "number"},
+         "zone": {"type": "object", "description": "zone the design after building: {zone_type, depth_m (default 32), types (default [Small Road]), start_m, side, overwrite}"},
+         "note": {"type": "string"}, "replace": {"type": "boolean", "description": "overwrite a design with the same name"},
+         "demolish_file": {"type": "string", "description": "JSON file with demolish boxes"},
+         "allow_island": {"type": "boolean", "description": "stage even if auto_fix leaves a group that touches no existing road (default: the loose groups are trimmed)"},
+         "min_keep": {"type": "number", "description": "share of the segments sent that must survive trimming errors and loose groups (default 0.8); below it the design is refused"},
+         "allow_heavy_trim": {"type": "boolean", "description": "stage even if more than 1-min_keep of the segments had to be trimmed"},
+         "demolish": {"type": "array", "items": {"type": "object"}, "description": "boxes [{xmin,zmin,xmax,zmax}] whose buildings are demolished at commit time (roads untouched); preview errors inside them are ignored when staging"}},
+      "required": ["name"]}, t_queue_add),
+    ("cs2_queue_add_batch", "Stage many designs at once: every <prefix><n>_segments.json in `dir` (with an optional <prefix><n>_demoler.json of demolish boxes) goes through cs2_queue_add "
+     "(auto_fix, island check, conflicts with designs already staged). Returns which designs were staged and which were refused and why. Builds nothing.",
+     {"type": "object", "properties": {"dir": {"type": "string"}, "prefix": {"type": "string"}, "name_prefix": {"type": "string"},
+                                       "zone": {"type": "object", "description": "{zone_type, depth_m, types, ...} applied to every design"},
+                                       "snap_tolerance": {"type": "number"}, "note": {"type": "string"}, "min_keep": {"type": "number"}, "allow_heavy_trim": {"type": "boolean"}, "allow_island": {"type": "boolean"}}, "required": ["dir"]}, t_queue_add_batch),
+    ("cs2_queue_list", "List the staged designs: name, segment count, bounding box, zoning, segments dropped by auto_fix / by conflicts with other staged designs, unconnected groups. Changes nothing.",
+     {"type": "object", "properties": {}}, t_queue_list),
+    ("cs2_queue_remove", "Remove one staged design by name, or all of them (all=true). Changes nothing in the game.",
+     {"type": "object", "properties": {"name": {"type": "string"}, "all": {"type": "boolean"}}}, t_queue_remove),
+    ("cs2_queue_commit", "Build the staged designs (all, or `names`) in order with a single call: pauses the game, then for each design builds it in chunks of <= `chunk` segments "
+     "(hold with auto_fix, then commit - whatever changed since staging is dropped instead of failing), checks for road islands around it and applies its zoning. "
+     "Stops at the first design that fails (stop_on_error=false keeps going); finished designs leave the queue. Returns the per-design report with undo ids.",
+     {"type": "object", "properties": {"names": {"type": "array", "items": {"type": "string"}}, "chunk": {"type": "integer", "description": "max segments per commit (default 100)"},
+                                       "zone": {"type": "boolean", "description": "apply the designs' zoning (default true)"}, "pause_s": {"type": "number"},
+                                       "stop_on_error": {"type": "boolean"}}}, t_queue_commit),
     ("cs2_place_roads", "Place road segments [{start:[x,z], end:[x,z], type?, control?:[x,z] (quadratic curve), controls?:[[x,z],[x,z]] "
      "(cubic curve)}] inline or from segments_file. Endpoints within snap_tolerance of existing nodes/roads connect to them; "
      "an end landing on another new segment of the batch makes a T junction; utilities (pipes, power lines) are ignored. The game previews first; if the "
@@ -881,6 +925,9 @@ TOOLS = [
          "snap_tolerance": {"type": "number"}, "dry_run": {"type": "boolean"}, "allow_errors": {"type": "boolean"},
          "hold": {"type": "boolean", "description": "leave the preview on screen; then cs2_preview_commit / cs2_preview_cancel"},
          "no_intersections": {"type": "boolean", "description": "do not join roads this crosses (default: crossings become junctions)"},
+         "auto_fix": {"type": "boolean", "description": "dry_run / hold with errors: drop the segments that sit on an error position and preview again until clean (default true); the result lists what was dropped and any group left unconnected. A held preview that cannot be cleaned is cancelled"},
+         "auto_fix_rounds": {"type": "integer", "description": "max fix-and-preview rounds (default 4)"},
+         "auto_fix_radius": {"type": "number", "description": "a segment closer than this many metres to an error position is dropped (default 12)"},
          "skip_failing": {"type": "boolean", "description": "if the game refuses the batch, find the refused segments by bisecting with dry runs, build the rest and return the refused ones"},
          "verbose": {"type": "boolean", "description": "include created_ids (default: just their count)"}}}, t_place_roads),
     ("cs2_district_grid", "Draft ONE district's street grid inside an outline you chose (polygon [[x,z],...], or an area box). You "

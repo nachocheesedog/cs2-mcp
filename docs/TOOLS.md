@@ -1,6 +1,6 @@
 # Tool reference
 
-All 124 tools the `cs2` MCP server exposes, generated from the server's registry by `tools/gen_tools_doc.py`. `*` = required parameter.
+All 129 tools the `cs2` MCP server exposes, generated from the server's registry by `tools/gen_tools_doc.py`. `*` = required parameter.
 
 Conventions: world coordinates are the game's (x/z horizontal in metres, y up); zoning cells are 8 m. Every editing tool accepts `dry_run` (preview + error reasons, nothing built) and most accept `hold` (keep the preview until `cs2_preview_commit` / `cs2_preview_cancel`). Edits return an `undo_id` for `cs2_undo`.
 
@@ -549,6 +549,9 @@ Place road segments [{start:[x,z], end:[x,z], type?, control?:[x,z] (quadratic c
 | `allow_errors` | boolean |  |
 | `hold` | boolean | leave the preview on screen; then cs2_preview_commit / cs2_preview_cancel |
 | `no_intersections` | boolean | do not join roads this crosses (default: crossings become junctions) |
+| `auto_fix` | boolean | dry_run / hold with errors: drop the segments that sit on an error position and preview again until clean (default true); the result lists what was dropped and any group left unconnected. A held preview that cannot be cleaned is cancelled |
+| `auto_fix_rounds` | integer | max fix-and-preview rounds (default 4) |
+| `auto_fix_radius` | number | a segment closer than this many metres to an error position is dropped (default 12) |
 | `skip_failing` | boolean | if the game refuses the batch, find the refused segments by bisecting with dry runs, build the rest and return the refused ones |
 | `verbose` | boolean | include created_ids (default: just their count) |
 
@@ -1834,6 +1837,69 @@ Undo the most recent change made through this MCP (place roads / bulldoze / repl
 |---|---|---|
 | `expect_id` | integer |  |
 | `count` | integer | undo this many changes, newest first (default 1) |
+
+### `cs2_queue_add`
+
+Stage a road design WITHOUT building it: previews it as a dry_run with auto_fix and stores the cleaned segments (plus an optional zoning spec) in the design queue. Same segment arguments as cs2_place_roads (segments / segments_file, type, snap_tolerance, lattice options...). Segments that cross or overlap a design already staged are dropped (first come first served). Stage 2-4 designs, review them with cs2_queue_list, then build them all with ONE cs2_queue_commit.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `name` * | string | unique name of the design |
+| `segments` | object[] |  |
+| `segments_file` | string |  |
+| `type` | string |  |
+| `snap_tolerance` | number |  |
+| `auto_fix_rounds` | integer |  |
+| `auto_fix_radius` | number |  |
+| `zone` | object | zone the design after building: {zone_type, depth_m (default 32), types (default [Small Road]), start_m, side, overwrite} |
+| `note` | string |  |
+| `replace` | boolean | overwrite a design with the same name |
+| `demolish_file` | string | JSON file with demolish boxes |
+| `allow_island` | boolean | stage even if auto_fix leaves a group that touches no existing road (default: the loose groups are trimmed) |
+| `min_keep` | number | share of the segments sent that must survive trimming errors and loose groups (default 0.8); below it the design is refused |
+| `allow_heavy_trim` | boolean | stage even if more than 1-min_keep of the segments had to be trimmed |
+| `demolish` | object[] | boxes [{xmin,zmin,xmax,zmax}] whose buildings are demolished at commit time (roads untouched); preview errors inside them are ignored when staging |
+
+### `cs2_queue_add_batch`
+
+Stage many designs at once: every <prefix><n>_segments.json in `dir` (with an optional <prefix><n>_demoler.json of demolish boxes) goes through cs2_queue_add (auto_fix, island check, conflicts with designs already staged). Returns which designs were staged and which were refused and why. Builds nothing.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `dir` * | string |  |
+| `prefix` | string |  |
+| `name_prefix` | string |  |
+| `zone` | object | {zone_type, depth_m, types, ...} applied to every design |
+| `snap_tolerance` | number |  |
+| `note` | string |  |
+| `min_keep` | number |  |
+| `allow_heavy_trim` | boolean |  |
+| `allow_island` | boolean |  |
+
+### `cs2_queue_list`
+
+List the staged designs: name, segment count, bounding box, zoning, segments dropped by auto_fix / by conflicts with other staged designs, unconnected groups. Changes nothing.
+
+### `cs2_queue_remove`
+
+Remove one staged design by name, or all of them (all=true). Changes nothing in the game.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `name` | string |  |
+| `all` | boolean |  |
+
+### `cs2_queue_commit`
+
+Build the staged designs (all, or `names`) in order with a single call: pauses the game, then for each design builds it in chunks of <= `chunk` segments (hold with auto_fix, then commit - whatever changed since staging is dropped instead of failing), checks for road islands around it and applies its zoning. Stops at the first design that fails (stop_on_error=false keeps going); finished designs leave the queue. Returns the per-design report with undo ids.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `names` | string[] |  |
+| `chunk` | integer | max segments per commit (default 100) |
+| `zone` | boolean | apply the designs' zoning (default true) |
+| `pause_s` | number |  |
+| `stop_on_error` | boolean |  |
 
 ## Assets and prefabs
 

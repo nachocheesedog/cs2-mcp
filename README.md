@@ -14,7 +14,7 @@ MCP client (Claude Code, …)
         │  stdio (MCP)
         ▼
 server/cs2_mcp.py ──── HTTP, 127.0.0.1:17654 only ────▶ CS2MCP mod (inside the game)
- 124 tools: planning, geometry,                          runs each command on the game's main
+ 129 tools: planning, geometry,                          runs each command on the game's main
  maps, checks                                            thread; edits go through a custom tool
                                                          (preview → error check → apply → undo)
 ```

@@ -13,7 +13,7 @@ CATEGORIES = [
     ("Buildings, objects, terrain and areas", "place_building place_objects bulldoze terraform delete_areas"),
     ("Districts", "create_district delete_district rename_district set_district_policy"),
     ("City services and transit", "service_coverage service_budget service_sites park_sites attractiveness transit_report foot_traffic commute_flows station_sites sites_tiled service_access upgrade_all fix_access"),
-    ("Previews and undo", "preview_commit preview_cancel undo"),
+    ("Previews and undo", "preview_commit preview_cancel undo queue_add queue_add_batch queue_list queue_remove queue_commit"),
     ("Assets and prefabs", "asset_validate asset_import asset_configure prefab_clone prefab_components prefab_entity prefab_overrides mesh_materials mesh_export texture_export missing_assets menu_assets prefab_create brand_info brand_bind brand_bindings"),
 ]
 
